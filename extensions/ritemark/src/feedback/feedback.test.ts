@@ -8,7 +8,8 @@
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import { test } from 'node:test';
-import type { FeedbackSheetOutcome, FeedbackSheetSpec } from './feedbackSheet';
+import type { FeedbackSheetOutcome } from './answerFeedbackProtocol';
+import type { FeedbackSheetSpec } from './feedbackSheet';
 import { composeReport, LAST_ANSWER_LABEL, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { DELIVERY_CLAIM_WORDS } from '../reporting/reportCopy';
 import { buildMailtoUrl, fitsInMailto, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
@@ -155,7 +156,7 @@ test('feedback command validates the open and binds submissions to its card and 
     const closed = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!(options);
     await Promise.resolve();
     await Promise.resolve();
-    return { spec, close: async (result: FeedbackSheetOutcome = 'cancelled') => { dismiss(result); await closed; } };
+    return { spec, close: async (result: FeedbackSheetOutcome = 'cancelled') => { dismiss(result); return closed; } };
   }
   const bad = await open({ from: 'unknown', quote: { title: 1, line: 'words' }, text: {}, turn: { conversationId: 'chat', turnId: ' ' } });
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'command' } });
@@ -177,7 +178,7 @@ test('feedback command validates the open and binds submissions to its card and 
   }
 
   const start = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!;
-  await t.test('thumb opens confirm a real sheet and decline when the answer or sheet is unavailable', async () => {
+  await t.test('thumb opens relay the outcome and fail when the answer or sheet is unavailable', async () => {
     const options = { from: 'thumb', kind: 'ai-issue', turn, text: 'My words', withAnswer: true };
     const opening = start(options);
     await Promise.resolve();
@@ -185,15 +186,19 @@ test('feedback command validates the open and binds submissions to its card and 
     assert.equal(spec.lastAnswer?.quote, 'Chosen answer.');
     const duplicate = await start(options);
     dismiss('cancelled');
-    assert.equal(duplicate, false, 'the sheet already open did not take the second draft');
-    assert.equal(await opening, true, 'the sheet took the draft');
+    assert.equal(await opening, 'cancelled');
+    assert.equal(duplicate, 'failed', 'the sheet already open did not take the second draft');
+    for (const outcome of ['sent', 'mailed'] as const) {
+      const sheet = await open(options);
+      assert.equal(await sheet.close(outcome), outcome);
+    }
     const shown = shows;
-    assert.equal(await start({ ...options, turn: { ...turn, turnId: 'missing' } }), false);
+    assert.equal(await start({ ...options, turn: { ...turn, turnId: 'missing' } }), 'failed');
     assert.equal(shows, shown, 'a vanished answer is not replaced with a different answer');
     rejectSheet = true;
     const priorInputBoxes = inputBoxes;
     try {
-      assert.equal(await start(options), false);
+      assert.equal(await start(options), 'failed');
       assert.equal(inputBoxes, priorInputBoxes, 'a plain input box cannot take the answer');
     } finally {
       rejectSheet = false;

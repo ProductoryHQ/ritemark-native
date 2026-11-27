@@ -307,14 +307,6 @@ export class GuidanceStore {
     });
   }
 
-  dropAnswerReactions(conversationId: string): Promise<void> {
-    return this.change((state) => {
-      const marks = state.answerReactions;
-      if (!marks?.some(mark => mark.conversationId === conversationId)) return state;
-      return { ...state, answerReactions: marks.filter(mark => mark.conversationId !== conversationId) };
-    });
-  }
-
   answerFeedback(answer: 'sent' | 'not-now'): Promise<void> {
     return this.change((state) => ({ ...state, release: { ...this.release(state), feedback: answer } }));
   }

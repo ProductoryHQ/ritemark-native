@@ -131,12 +131,16 @@ export const answerFeedbackStore = create<FeedbackState>((set, get) => {
       };
       vscode.postMessage(message);
     },
-    finishOpen({ requestId, ok }) {
+    finishOpen({ requestId, outcome }) {
       const target = pendingOpens.get(requestId);
       if (!target) return;
       pendingOpens.delete(requestId);
       if (feedbackEntry(get(), target).openingSheet !== requestId) return;
-      patch(target, { openingSheet: undefined, failed: !ok, ...(ok ? { text: '' } : {}) });
+      patch(target, {
+        openingSheet: undefined,
+        failed: outcome === 'failed',
+        ...(outcome === 'sent' || outcome === 'mailed' ? { text: '' } : {}),
+      });
     },
   };
 });

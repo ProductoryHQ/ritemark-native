@@ -32,7 +32,7 @@ const { flushSync } = await import('react-dom');
 const { createConversationState } = await import('./conversationState');
 const { useAISidebarStore } = await import('./store');
 const { UnifiedConversationView } = await import('./UnifiedConversationView');
-const { answerFeedbackStore } = await import('./answerFeedbackState');
+const { answerFeedbackStore, feedbackEntry } = await import('./answerFeedbackState');
 const turn = (id: string, timestamp: number) => ({ id, timestamp, userPrompt: 'Prompt', activities: [], isRunning: false });
 const done = { status: 'completed' as const };
 const conversation = createConversationState('chat', {
@@ -244,35 +244,55 @@ test('failed Send keeps the words and Add this answer opens the sheet for the se
   assert.equal(typeof request.requestId, 'number');
   const options = { from: 'thumb', kind: 'ai-issue', turn: older, withAnswer: true, text: ' A correction ' };
   assert.deepEqual(request, { type: 'agent:openFeedback', requestId: request.requestId, options });
-  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId + 1, ok: true });
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId + 1, outcome: 'sent' });
   assert.ok(form(), 'ignore unrelated sheet confirmations');
-  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: false });
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, outcome: 'failed' });
   assert.equal(form()?.querySelector('textarea')?.value, ' A correction ');
   assert.match(form()?.textContent ?? '', /It didn't go/);
   click(button(form(), 'Add this answer…'));
   const retry = messages.pop() as { requestId: number };
   assert.deepEqual(retry, { type: 'agent:openFeedback', requestId: retry.requestId, options });
-  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: true });
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, outcome: 'sent' });
   assert.ok(form(), 'ignore a stale confirmation after retrying');
-  reply({ type: 'agent:openFeedbackResult', requestId: retry.requestId, ok: true });
+  reply({ type: 'agent:openFeedbackResult', requestId: retry.requestId, outcome: 'sent' });
   assert.ok(!form());
 });
 
-test('a confirmed sheet opening clears the handed-off words before the line opens again', () => {
-  const older = { conversationId: 'chat', turnId: 'claude-done' };
-  click(button(turnContainer(older.turnId), 'Not right'));
-  flushSync(() => answerFeedbackStore.getState().edit(older, 'A correction'));
-  click(button(form(), 'Add this answer…'));
-  const request = messages.pop() as { requestId: number };
-  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: true });
-  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'down', accepted: true, sent: false });
-  click(button(turnContainer(older.turnId), 'Take back'));
-  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'none', accepted: true, sent: false });
-  click(button(turnContainer(older.turnId), 'Good answer'));
-  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'up', accepted: true, sent: false });
-  click(button(turnContainer(older.turnId), 'Tell us more'));
-  assert.equal(form()?.querySelector('textarea')?.value, '');
-});
+for (const [outcome, sent] of [['cancelled', false], ['cancelled', true], ['sent', true], ['mailed', true]] as const) {
+  test(`a sheet that closes as ${outcome} closes the line and keeps only unsent words (mark ${sent ? 'sent' : 'local'})`, () => {
+    click(button(doneRow(), 'Not right'));
+    reply({ type: 'agent:answerReactionResult', ...target, reaction: 'down', accepted: true, sent });
+    edit('A correction');
+    click(button(form(), 'Add this answer…'));
+    const { requestId } = messages.pop() as { requestId: number };
+    reply({ type: 'agent:openFeedbackResult', requestId, outcome });
+    const expected = outcome === 'cancelled' ? 'A correction' : '';
+    assert.equal(feedbackEntry(answerFeedbackStore.getState(), target).text, expected);
+    assert.ok(!form());
+    const footer = doneRow()?.querySelector('[data-answer-feedback-controls]');
+    assert.equal(footer?.querySelector('[role="status"]')?.textContent, sent ? 'Thanks.' : undefined);
+    assert.equal(footer?.querySelector('span[aria-hidden="true"]')?.textContent, sent ? '·' : undefined);
+    click(button(doneRow(), 'Tell us more'));
+    assert.equal(form()?.querySelector('textarea')?.value, expected);
+  });
+}
+
+for (const sent of [true, false]) {
+  for (const dismissal of ['Escape', 'outside click'] as const) {
+    test(`a down mark (${sent ? 'sent' : 'local'}) offers the draft again after ${dismissal}`, () => {
+      click(button(doneRow(), 'Not right'));
+      reply({ type: 'agent:answerReactionResult', ...target, reaction: 'down', accepted: true, sent });
+      assert.ok(!button(doneRow(), 'Tell us more'));
+      edit('Keep these words');
+      if (dismissal === 'Escape') dispatch(form()!.querySelector('textarea')!, 'keydown', 'Escape');
+      else dispatch(container, 'pointerdown');
+      assert.ok(!form());
+      assert.equal(doneRow()?.querySelector('[data-answer-feedback-controls] [role="status"]')?.textContent, sent ? 'Thanks.' : undefined);
+      click(button(doneRow(), 'Tell us more'));
+      assert.equal(form()?.querySelector('textarea')?.value, 'Keep these words');
+    });
+  }
+}
 
 test('a delivered message closes the draft and shows thanks even when the mark was never sent', () => {
   click(button(doneRow(), 'Not right'));
@@ -286,6 +306,7 @@ test('a delivered message closes the draft and shows thanks even when the mark w
   assert.ok(!form());
   assert.equal(document.activeElement?.getAttribute('aria-label'), 'Take back');
   assert.match(doneRow()?.textContent ?? '', /Thanks\./);
+  assert.ok(!button(doneRow(), 'Tell us more'));
 });
 
 test('restored marks are scoped to the conversation and an empty snapshot clears them', () => {

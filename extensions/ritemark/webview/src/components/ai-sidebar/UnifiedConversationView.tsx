@@ -132,6 +132,7 @@ export function UnifiedConversationView() {
     ? lastMerged.turn.id : undefined;
   const feedbackControls = (turnId: string) => (
     <AnswerFeedbackControls
+      draftOpen={feedbackDraftIsOpen(openFeedbackDraft, feedbackScope, turnId)}
       target={{ conversationId: activeConversation.id, turnId }}
       openForm={(trigger) => setOpenFeedbackDraft({ ...feedbackScope, turnId, trigger })}
       closeForm={closeFeedbackDraft}

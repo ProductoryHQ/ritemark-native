@@ -10,18 +10,22 @@ import { FeedbackLink } from './FeedbackLink';
 import { answerFeedbackStore, feedbackEntry, type AnswerTarget } from './answerFeedbackState';
 
 export function AnswerFeedbackControls({
-  target, openForm, closeForm,
+  target, draftOpen, openForm, closeForm,
 }: {
-  target: AnswerTarget; openForm(trigger: () => HTMLButtonElement | null): void; closeForm(): void;
+  target: AnswerTarget; draftOpen: boolean; openForm(trigger: () => HTMLButtonElement | null): void; closeForm(): void;
 }) {
   const { reaction, pendingReaction, markSent, wordsSent } = answerFeedbackStore((state) => feedbackEntry(state, target));
   const mark = pendingReaction ?? reaction;
+  const showMarkFooter = mark === 'up' || (mark === 'down' && !draftOpen);
+  const showMore = showMarkFooter && !wordsSent;
+  const showThanks = wordsSent || (showMarkFooter && mark === reaction && markSent);
   const up = useRef<HTMLButtonElement>(null);
   const down = useRef<HTMLButtonElement>(null);
   return (
     <div data-answer-feedback-controls className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] text-ink-muted">
-      {(wordsSent || (mark === 'up' && reaction === 'up' && markSent)) && <span role="status">{copy.thanks}</span>}
-      {mark === 'up' && !wordsSent && <FeedbackLink onClick={() => openForm(() => up.current)}>{copy.tellUsMore}</FeedbackLink>}
+      {showThanks && <span role="status">{copy.thanks}</span>}
+      {showThanks && showMore && <span aria-hidden="true">·</span>}
+      {showMore && <FeedbackLink onClick={() => openForm(() => mark === 'up' ? up.current : down.current)}>{copy.tellUsMore}</FeedbackLink>}
       {(['up', 'down'] as const).map((thumb) => {
         if (mark !== 'none' && mark !== thumb) return null;
         const pressed = mark === thumb;

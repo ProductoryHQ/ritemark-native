@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ConversationStore } from '../conversations/ConversationStore';
+import { projectScopeId } from '../conversations/projectScope';
 import { test } from 'node:test';
 import { ConsentGate, type CaptureClient } from '../analytics/consent';
 import type { AgentId } from '../agent/types';
@@ -32,7 +37,7 @@ function record(
   };
 }
 
-function harness(on: boolean, source = record()) {
+function harness(on: boolean, source = record(), readConversation = async (_id: string) => source as ConversationRecordV1 | null) {
   let saved: unknown;
   let writes = 0;
   const guidance = new GuidanceStore({
@@ -61,7 +66,7 @@ function harness(on: boolean, source = record()) {
     activeConversation: () => settings.active,
     readConversation: async (id) => {
       assert.equal(id, conversationId);
-      return source;
+      return readConversation(id);
     },
     trackAnswerReaction: (reaction, ai) => gate.track('ai_answer_reacted', { reaction, ai }),
     sendFeedback: (messages) => gate.sendFeedback(messages),
@@ -119,7 +124,7 @@ test('snapshots advertise only unambiguous completed answers, including before t
   assert.equal((await host.activeAnswer({ conversationId, turnId: 'fresh' }))?.content, 'Answer for fresh');
 });
 
-test('stored marks keep the 500 newest globally and drop deleted chats', async () => {
+test('stored marks keep the 500 newest globally', async () => {
   const { guidance } = harness(false);
   await guidance.changeAnswerReaction(ref, 'up');
   for (let index = 0; index < 499; index++) {
@@ -128,9 +133,28 @@ test('stored marks keep the 500 newest globally and drop deleted chats', async (
   await guidance.changeAnswerReaction({ ...ref, turnId: 'newest' }, 'up');
   assert.deepEqual(guidance.answerReactionsOf(conversationId).map(mark => mark.turnId), ['newest']);
   assert.equal(guidance.answerReactionsOf(otherConversation).length, 499);
-  await guidance.dropAnswerReactions(otherConversation);
-  assert.deepEqual(guidance.answerReactionsOf(otherConversation), []);
-  assert.equal(guidance.answerReactionsOf(conversationId).length, 1);
+});
+
+test('undoing a deletion restores the answer with its sent mark', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'ritemark-answer-feedback-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const store = new ConversationStore(directory);
+  const source = record();
+  const saved = await store.create({ ...source, scopeId: projectScopeId(source.scope) });
+  const { host, events } = harness(true, source, id => store.get(id));
+  assert.equal((await press(host, 'up'))?.sent, true);
+  const deletion = await store.delete(conversationId, saved.bindingGeneration);
+  assert.equal(await store.get(conversationId), null);
+  await store.restore(deletion.undoToken);
+  assert.deepEqual((await host.snapshot(conversationId))?.reactions, [
+    { turnId: ref.turnId, reaction: 'up', sent: true },
+  ]);
+  assert.equal((await press(host, 'up'))?.accepted, false);
+  assert.equal(events.length, 1);
+
+  // The sidebar wraps the store's deletion with a native Undo notification.
+  const provider = await readFile(join(__dirname, '../views/UnifiedViewProvider.ts'), 'utf8');
+  assert.equal(provider.includes('dropAnswerReactions'), false, 'the sidebar delete handler must leave local marks intact');
 });
 
 test('marks from the grouped store migrate without changing their delivery state', async () => {

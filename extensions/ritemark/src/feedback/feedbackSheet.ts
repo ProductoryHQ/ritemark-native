@@ -22,6 +22,7 @@ import * as vscode from 'vscode';
 import { sendFeedback, trackEvent } from '../analytics/posthog';
 import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { openReportMail, type ReportTransportOutcome } from '../reporting/reportTransport';
+import type { FeedbackSheetOutcome, OpenAnswerFeedbackResult } from './answerFeedbackProtocol';
 import { FEEDBACK_COPY } from './feedbackCopy';
 import { isSafeFeedbackQuotePart } from './feedbackQuoteSafety';
 import { answerForSheet, mailKindOf, routeOf } from './feedbackRoute';
@@ -83,9 +84,6 @@ export interface FeedbackSubmitRequest {
 export type FeedbackSubmitResult =
   | { route: 'straight'; outcome: 'accepted' | 'failed' }
   | { route: 'email'; outcome: ReportTransportOutcome | 'invalid'; kindLabel: string; shown: string; copyText: string };
-
-/** What the workbench's sheet resolves with once it closes (patch 018's `RitemarkFeedbackSheetOutcome`). */
-export type FeedbackSheetOutcome = 'sent' | 'mailed' | 'cancelled';
 
 export interface FeedbackDependencies {
   appVersion: string;
@@ -173,8 +171,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
   let open: OpenSheet | null = null;
 
   let opening = false;
-  const openSheet = async (raw?: unknown): Promise<boolean> => {
-    if (opening) return false;
+  const openSheet = async (raw?: unknown): Promise<OpenAnswerFeedbackResult['outcome']> => {
+    if (opening) return 'failed';
     opening = true;
     try {
       const options = decodeOpen(raw);
@@ -185,7 +183,7 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
         : contextual ? Promise.resolve(null) : deps.lastAnswer()).catch(() => null);
       const answer = last ? answerForSheet(reportContext, last.text) : null;
       const addAnswer = options.from === 'thumb' && options.withAnswer;
-      if (addAnswer && !answer) return false;
+      if (addAnswer && !answer) return 'failed';
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
       const includeAnswer = Boolean(options.withAnswer && options.turn && answer);
@@ -207,22 +205,22 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       try {
         result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
       } catch {
-        if (addAnswer) return false; // The fallback input box cannot take the answer.
+        if (addAnswer) return 'failed'; // The fallback input box cannot take the answer.
         // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
         if (spec.aiIssue && !contextual) {
           await deps.openReportWindow();
-          return false;
+          return 'failed';
         }
         const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, value: options.text, ignoreFocusOut: true });
-        if (!text?.trim()) return false;
+        if (!text?.trim()) return 'cancelled';
         const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), from: sentFrom(options.from) } }]);
         if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
         else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
-        return false;
+        return sent ? 'sent' : 'failed';
       }
       if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
       // The existing workbench command reports the outcome when the sheet closes.
-      return result === 'sent' || result === 'mailed' || result === 'cancelled';
+      return result === 'sent' || result === 'mailed' || result === 'cancelled' ? result : 'failed';
     } finally {
       open = null;
       opening = false;

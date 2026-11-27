@@ -583,8 +583,6 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
             && 'title' in response.data) {
             const deletion = response.data;
             if (this._activeConversationId === deletion.conversationId) this._noteActiveConversation(null);
-            void this.guidanceStore.dropAnswerReactions(deletion.conversationId)
-              .catch((error: unknown) => console.warn('[Feedback] Could not discard reactions for a deleted chat:', error));
             void showConversationDeleteNotification({
               undoToken: deletion.undoToken,
               title: deletion.title,
@@ -872,17 +870,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
           const eligible = options && (options.from !== 'thumb' || await this._answerFeedback.activeAnswer(options.turn));
           const target = { webview: webviewView.webview, generation: viewGeneration };
           if (!this._isCurrentSidebarView(target.webview, target.generation)) break;
-          let ok = false;
+          let outcome: OpenAnswerFeedbackResult['outcome'] = 'failed';
           if (eligible) {
             try {
-              ok = await vscode.commands.executeCommand<boolean>(FEEDBACK_OPEN_COMMAND, options) === true;
+              outcome = await vscode.commands.executeCommand<OpenAnswerFeedbackResult['outcome']>(
+                FEEDBACK_OPEN_COMMAND, options,
+              ) ?? 'failed';
             } catch {
               // The reply leaves the inline words available for another attempt.
             }
           }
           if (Number.isSafeInteger(requestId)) {
             await this._postCurrentSidebarMessage(target, {
-              type: 'agent:openFeedbackResult', requestId, ok,
+              type: 'agent:openFeedbackResult', requestId, outcome,
             } satisfies OpenAnswerFeedbackResult, 'feedback');
           }
           break;

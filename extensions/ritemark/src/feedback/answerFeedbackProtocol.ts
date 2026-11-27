@@ -43,10 +43,12 @@ export interface OpenAnswerFeedbackMessage {
     | { from: 'failure_card'; quote?: { title: string; line: string } };
 }
 
+export type FeedbackSheetOutcome = 'sent' | 'mailed' | 'cancelled';
+
 export interface OpenAnswerFeedbackResult {
   type: 'agent:openFeedbackResult';
   requestId: number;
-  ok: boolean;
+  outcome: FeedbackSheetOutcome | 'failed';
 }
 
 export interface StoredAnswerReaction {
