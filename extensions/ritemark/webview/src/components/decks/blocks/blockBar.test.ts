@@ -835,7 +835,9 @@ stable(COLUMNS, 'three columns')
   assert.equal(MAX_FOLD, FOLD_AT.mark, 'every group can fold')
   {
     const barSource = readFileSync(new URL('./SlideBlockBar.tsx', import.meta.url), 'utf8')
-    assert.match(barSource, /<Segment label="Reveal">\s*<Choice\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
+    // One by one is a lone toggle with no segment track (the Experience lead, 27 November): off has no ground.
+    assert.ok(!barSource.includes('<Segment label="Reveal">'), 'One by one sits in no segment track')
+    assert.match(barSource, /<Choice\s+plain\s+on=\{reveal\}\s+icon="cards-three"\s+label=\{fold >= FOLD_AT\.reveal \? undefined : REVEAL_LABEL\}\s+tip=\{REVEAL_TIP\}\s+onPick=\{\(\) => run\(act\(pos => setReveal\(editor\.state, pos, !reveal\)\)\)\}/)
     assert.ok(!barSource.includes("label: 'All at once'"), 'no second choice: off is All at once')
     for (const group of ['Style', 'Columns']) assert.ok(new RegExp(`<Group label="${group}" folded=\\{fold >= FOLD_AT\\.(style|size)\\}`).test(barSource), group)
     assert.match(barSource, /<Group label="Size" folded icon="columns" tip=/)
