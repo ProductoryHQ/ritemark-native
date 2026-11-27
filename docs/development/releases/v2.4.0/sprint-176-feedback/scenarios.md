@@ -10,11 +10,11 @@ Given usage data is off or the machine is offline, when I press Good answer, the
 
 ### S3 · Optional words and answer (R1)
 
-Given I press Not right or open Tell us more, when I enter words and Send with Add this answer off, then only my words use the straight route; with usage data on the source (`from: thumb`) goes with them, and with it off only the words go. When I opt in to an answer excerpt, then the preview matches the e-mail body and Copy fallback. Esc or an outside click before sending discards the draft and sends no content.
+Given I press Not right or open Tell us more, when I enter words and press Send, then only my words use the straight route; with usage data on the source (`from: thumb`) goes with them, and with it off only the words go. When I select Add this answer…, Report an AI issue opens with my words and that turn’s answer selected for the e-mail route. Esc or an outside click closes the line without sending. Starting another turn or switching chats also closes the line without sending.
 
 ### S4 · A failure quote I can remove (R2)
 
-Given a supported failure card, when I open Tell us about this, then its displayed words are quoted and editable. Remove them and add my own words, then Send. The receiving side gets only the final field and fixed source, with no diagnostics added. Repeat with usage data off and check the one-off identifier and absence of shared properties. Opening alone sends no quote.
+Given a supported failure card, when I open Tell us about this, then its displayed words are quoted in a removable block. Remove the quote and add my own words, then Send. The receiving side gets only the final field and fixed source, with no diagnostics added. Repeat with usage data off and check the one-off identifier and absence of shared properties. Opening alone sends no quote.
 
 ### S5 · Feedback when the network is down (R1, R2, R4)
 

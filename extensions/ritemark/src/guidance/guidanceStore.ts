@@ -16,6 +16,8 @@ import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { AgentId } from '../agent/types';
 import { testChannelRequested } from '../analytics/consent';
+import { isConversationId } from '../conversations/types';
+import type { AnswerFeedbackTarget, AnswerReaction, StoredAnswerReaction } from '../feedback/answerFeedbackProtocol';
 import { localDay, releaseOf, withSavedDay, SAVED_DAYS_FOR_FEEDBACK } from './guidanceState';
 import type { ReadyGone, ReadyRecord } from './readyRequest';
 
@@ -32,6 +34,7 @@ export interface GuidanceStateV1 {
   readyShownOn?: string;
   savedDays: string[];
   positiveReaction?: true;
+  answerReactions?: Record<string, StoredAnswerReaction[]>;
   /** null means an earlier build already ran on this profile. */
   firstAppRun?: string | null;
   release?: { id: string; savedDays: string[]; feedback?: 'sent' | 'not-now' };
@@ -49,6 +52,22 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isDay = (value: unknown): value is string => typeof value === 'string' && DAY.test(value);
 const daysOf = (value: unknown): string[] => Array.isArray(value) ? value.filter(isDay) : [];
+
+function decodeAnswerReactions(raw: unknown): Record<string, StoredAnswerReaction[]> {
+  const result: Record<string, StoredAnswerReaction[]> = {};
+  if (!raw || typeof raw !== 'object') return result;
+  for (const [conversationId, marks] of Object.entries(raw)) {
+    if (!isConversationId(conversationId) || !Array.isArray(marks)) continue;
+    const unique = new Map<string, StoredAnswerReaction>();
+    for (const entry of marks) {
+      if (!entry || typeof entry.turnId !== 'string' || !entry.turnId.trim()) continue;
+      if (entry.reaction !== 'up' && entry.reaction !== 'down') continue;
+      unique.set(entry.turnId, { turnId: entry.turnId, reaction: entry.reaction, sent: entry.sent === true });
+    }
+    if (unique.size) result[conversationId] = [...unique.values()];
+  }
+  return result;
+}
 
 /** A stored value read defensively: anything malformed is dropped, never trusted. */
 export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
@@ -68,11 +87,13 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
     }
   }
   const release = value.release as Record<string, unknown> | undefined;
+  const answerReactions = decodeAnswerReactions(value.answerReactions);
   return {
     v: 1,
     projects,
     savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_FEEDBACK),
     ...(value.positiveReaction === true ? { positiveReaction: true } : {}),
+    ...(Object.keys(answerReactions).length ? { answerReactions } : {}),
     ...(typeof value.firstAppRun === 'string' || value.firstAppRun === null ? { firstAppRun: value.firstAppRun } : {}),
     ...(typeof value.readyShownOn === 'string' && DAY.test(value.readyShownOn) ? { readyShownOn: value.readyShownOn } : {}),
     ...(release && typeof release.id === 'string'
@@ -243,6 +264,45 @@ export class GuidanceStore {
         return { ...state, savedDays, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } };
       }
       return savedDays === state.savedDays ? state : { ...state, savedDays };
+    });
+  }
+
+  notePositiveReaction(): Promise<void> {
+    return this.change((state) => state.positiveReaction ? state : { ...state, positiveReaction: true });
+  }
+
+  answerReactionsOf(conversationId: string): StoredAnswerReaction[] {
+    return isConversationId(conversationId) ? this.read().answerReactions?.[conversationId] ?? [] : [];
+  }
+
+  changeAnswerReaction({ conversationId, turnId }: AnswerFeedbackTarget, reaction: AnswerReaction): Promise<boolean> {
+    return this.serialize(async (state) => {
+      const answerReactions = { ...state.answerReactions };
+      const marks = answerReactions[conversationId] ?? [];
+      const current = marks.find((mark) => mark.turnId === turnId);
+      // A second mark requires Take back first, and an unmarked turn has nothing to take back.
+      if (Boolean(current) !== (reaction === 'none')) return false;
+      const next = reaction === 'none'
+        ? marks.filter((mark) => mark.turnId !== turnId)
+        : [...marks, { turnId, reaction, sent: false }];
+      if (next.length) answerReactions[conversationId] = next;
+      else delete answerReactions[conversationId];
+      await this.memento.update(GUIDANCE_KEY, { ...state, answerReactions });
+      return true;
+    });
+  }
+
+  noteAnswerReactionSent({ conversationId, turnId }: AnswerFeedbackTarget, reaction: StoredAnswerReaction['reaction']): Promise<void> {
+    return this.change((state) => {
+      const marks = state.answerReactions?.[conversationId];
+      if (!marks?.some((mark) => mark.turnId === turnId && mark.reaction === reaction && !mark.sent)) return state;
+      return {
+        ...state,
+        answerReactions: {
+          ...state.answerReactions,
+          [conversationId]: marks.map((mark) => mark.turnId === turnId ? { ...mark, sent: true } : mark),
+        },
+      };
     });
   }
 

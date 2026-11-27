@@ -1,3 +1,4 @@
+import type { AnswerFeedbackResult, AnswerReactionResult, AnswerReactionsMessage } from '../../../../src/feedback/answerFeedbackProtocol';
 /**
  * AI Sidebar Types
  *
@@ -500,6 +501,9 @@ export interface ConversationScopedMessage {
 
 export type ExtensionMessage =
   | AgentSidebarProtocolMessage
+  | AnswerFeedbackResult
+  | AnswerReactionResult
+  | AnswerReactionsMessage
   | { type: 'ai-key-status'; hasKey: boolean }
   | { type: 'connectivity-status'; isOnline: boolean }
   // Sprint 117 (#292, R4/D5): the host names the destination conversation for

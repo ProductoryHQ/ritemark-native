@@ -1,3 +1,4 @@
+import { FailureFeedbackLink } from './FailureFeedbackLink';
 import { Button } from '../ui/button';
 import { Icon, type PhosphorIconName } from '../ui/Icon';
 import { TurningMark } from '../ui/turning-mark';
@@ -29,6 +30,8 @@ interface RuntimeNoticeProps {
   primaryAction?: RuntimeNoticeAction;
   secondaryAction?: RuntimeNoticeAction;
   statusLabel?: string;
+  feedback?: boolean;
+  detail?: string;
 }
 
 /** Shared provider/setup notice used by both proactive and failed-turn recovery. */
@@ -39,6 +42,8 @@ export function RuntimeNotice({
   primaryAction,
   secondaryAction,
   statusLabel,
+  feedback = false,
+  detail,
 }: RuntimeNoticeProps) {
   const visual = {
     warning: { icon: 'warning' as const, background: 'var(--r-warning-soft)', color: 'var(--r-warning)' },
@@ -81,9 +86,10 @@ export function RuntimeNotice({
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold leading-5 text-[var(--r-ink-strong)]">{title}</div>
           <div className="mt-0.5 text-[11px] leading-[1.45] text-[var(--r-ink-muted)]">{message}</div>
+          {detail && <div className="mt-0.5 text-[11px] leading-[1.45] text-[var(--r-ink-muted)]">{detail}</div>}
         </div>
       </div>
-      {(statusLabel || hasActions) && (
+      {(statusLabel || hasActions || feedback) && (
         <div className="border-t border-[var(--r-hairline)] bg-[var(--r-surface-muted)] px-3 py-2">
           {statusLabel && (
             <div className="flex min-h-8 w-full items-center gap-1.5 pl-[34px] text-xs font-medium text-[var(--r-ink-strong)]" /* working: ink (Sprint 146) */>
@@ -91,36 +97,43 @@ export function RuntimeNotice({
               {statusLabel}
             </div>
           )}
-          {hasActions && (
-            <div className={`flex w-full flex-wrap items-center justify-end gap-1 ${statusLabel ? 'mt-1' : ''}`}>
-              {secondaryAction && (
-                <Tooltip label={secondaryAction.tooltip}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={secondaryAction.variant === 'ghost' ? 'ghost' : 'secondary'}
-                    onClick={secondaryAction.onAction}
-                    disabled={secondaryAction.disabled}
-                  >
-                    {secondaryAction.icon && <Icon name={secondaryAction.icon} size={12} tone="inherit" />}
-                    {secondaryAction.label}
-                  </Button>
-                </Tooltip>
+          {(hasActions || feedback) && (
+            <div className={`flex w-full flex-wrap items-center gap-1 ${statusLabel ? 'mt-1' : ''}`}>
+              {feedback && (
+                <div className="mr-2">
+                  <FailureFeedbackLink title={title} line={message} />
+                </div>
               )}
-              {primaryAction && (
-                <Tooltip label={primaryAction.tooltip}>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={primaryAction.variant ?? 'default'}
-                    onClick={primaryAction.onAction}
-                    disabled={primaryAction.disabled}
-                  >
-                    {primaryAction.icon && <Icon name={primaryAction.icon} size={12} tone="inherit" />}
-                    {primaryAction.label}
-                  </Button>
-                </Tooltip>
-              )}
+              {hasActions && <div className="ml-auto flex min-w-0 flex-wrap justify-end gap-1">
+                {secondaryAction && (
+                  <Tooltip label={secondaryAction.tooltip}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={secondaryAction.variant === 'ghost' ? 'ghost' : 'secondary'}
+                      onClick={secondaryAction.onAction}
+                      disabled={secondaryAction.disabled}
+                    >
+                      {secondaryAction.icon && <Icon name={secondaryAction.icon} size={12} tone="inherit" />}
+                      {secondaryAction.label}
+                    </Button>
+                  </Tooltip>
+                )}
+                {primaryAction && (
+                  <Tooltip label={primaryAction.tooltip}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={primaryAction.variant ?? 'default'}
+                      onClick={primaryAction.onAction}
+                      disabled={primaryAction.disabled}
+                    >
+                      {primaryAction.icon && <Icon name={primaryAction.icon} size={12} tone="inherit" />}
+                      {primaryAction.label}
+                    </Button>
+                  </Tooltip>
+                )}
+              </div>}
             </div>
           )}
         </div>

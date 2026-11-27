@@ -12,6 +12,7 @@
  */
 
 import { create } from 'zustand';
+import { answerFeedbackStore } from './answerFeedbackState';
 import { defaultCodexModelId } from './modelPresentation';
 import { resolveAvailableRuntimeModel } from './runtimeAvailability';
 import { vscode } from '../../lib/vscode';
@@ -2548,6 +2549,15 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (handleHostControlMessage(message)) return;
 
       switch (message.type) {
+        case 'agent:answerReactionResult':
+          answerFeedbackStore.getState().finishReaction(message);
+          break;
+        case 'agent:answerFeedbackResult':
+          answerFeedbackStore.getState().finishSend(message);
+          break;
+        case 'agent:answerReactions':
+          answerFeedbackStore.getState().restoreReactions(message);
+          break;
         case 'conversation/canonical-id': {
           const current = get();
           const local = current.conversations[message.clientConversationId];

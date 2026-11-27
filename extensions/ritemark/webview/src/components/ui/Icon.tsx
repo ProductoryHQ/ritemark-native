@@ -156,6 +156,8 @@ import {
   TextHThree,
   TextHTwo,
   TextT,
+  ThumbsDown,
+  ThumbsUp,
   Timer,
   Trash,
   Warning,
@@ -197,7 +199,7 @@ import {
 } from '@phosphor-icons/react'
 
 export type IconSize = 12 | 14 | 16 | 20
-export type IconWeight = 'regular' | 'duotone'
+export type IconWeight = 'regular' | 'duotone' | 'fill'
 /**
  * `inherit` takes the colour from the wrapping element instead of a role token.
  * It exists for conversation identity bubbles and controls whose semantic
@@ -362,6 +364,8 @@ const iconMap = {
   'text-h-three': TextHThree,
   'text-h-two': TextHTwo,
   'text-t': TextT,
+  'thumbs-down': ThumbsDown,
+  'thumbs-up': ThumbsUp,
   'timer': Timer,
   'trash': Trash,
   'warning': Warning,
