@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: daily-test-chain
@@ -27,6 +28,8 @@ jobs:
     steps:
       - name: Checkout Ritemark
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js 22.22.1
         uses: actions/setup-node@v5
@@ -51,7 +54,37 @@ jobs:
 
       - name: Show the failing lines
         if: failure()
-        run: grep -nE "not ok|Error|FAIL|✖" "$RUNNER_TEMP/npm-test.log" | head -60 || tail -60 "$RUNNER_TEMP/npm-test.log"
+        run: |
+          { grep -nE "not ok|Error|FAIL|✖" "$RUNNER_TEMP/npm-test.log" | head -60; echo '--- last lines ---'; tail -30 "$RUNNER_TEMP/npm-test.log"; } > "$RUNNER_TEMP/failing.txt" || true
+          cat "$RUNNER_TEMP/failing.txt"
+
+      # Red main is never silent: one open issue labelled test-chain-red carries the failing
+      # lines and the merges of the last day. The Development manager fixes it forward first,
+      # and no RC is cut while it is open. A green run closes it.
+      - name: Open or update the red-chain issue
+        if: failure() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh label create test-chain-red --color B60205 --description "Daily test chain failed on main" 2>/dev/null || true
+          {
+            echo "The daily test chain failed on \`main\` at \`${GITHUB_SHA::8}\` ([run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))."
+            echo; echo "**Merges in the last 25 hours:**"; echo
+            git log --since="25 hours ago" --format='- %h %s' origin/main
+            echo; echo "**Failing lines:**"; echo; echo '```'; head -c 60000 "$RUNNER_TEMP/failing.txt"; echo '```'
+          } > "$RUNNER_TEMP/body.md"
+          n=$(gh issue list --label test-chain-red --state open --json number -q '.[0].number')
+          if [ -n "$n" ]; then gh issue comment "$n" --body-file "$RUNNER_TEMP/body.md"
+          else gh issue create --title "Daily test chain is red on main" --label test-chain-red --body-file "$RUNNER_TEMP/body.md"; fi
+
+      - name: Close the red-chain issue
+        if: success() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --label test-chain-red --state open --json number -q '.[].number'); do
+            gh issue close "$n" --comment "Green again at \`${GITHUB_SHA::8}\` ([run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))."
+          done
 
       - name: Keep the log
         if: always()
