@@ -92,11 +92,11 @@ async function run() {
   {
     const withAssets = new DeckLibrary(project({
       'Kickoff.rtms': DECK,
-      'Kickoff files/Kickoff.html': DECK,
-      'Kickoff files/Internal.rtms': DECK,
-      'Notes files/x.rtms': DECK,
+      'Kickoff.rtms.files/Kickoff.html': DECK,
+      'Kickoff.rtms.files/Internal.rtms': DECK,
+      'Notes.rtms.files/x.rtms': DECK,
     }));
-    assert.deepEqual((await withAssets.listDecks()).map(deck => deck.path).sort(), ['Kickoff.rtms', 'Notes files/x.rtms']);
+    assert.deepEqual((await withAssets.listDecks()).map(deck => deck.path).sort(), ['Kickoff.rtms', 'Notes.rtms.files/x.rtms']);
     const legacy = project({ 'Slide library/AI assistants.deck.md': TOPIC, 'Talks/Day one.rtms': DECK });
     const legacyLibrary = new DeckLibrary(legacy);
     const write = await legacyLibrary.addToLibrary('Talks/Day one.rtms', 'AI assistants', { kind: 'statement', body: 'id: t8\ntitle: One more', handout: '' });

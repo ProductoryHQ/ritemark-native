@@ -1,6 +1,6 @@
 /**
  * Sprint 159 PR 4: Publish on the deck's bar. A deck is published as its handout page, a real file Ritemark writes
- * in its own folder (`<deck name> files/`, `page/pageFile.ts`). The hosted layout uses the former beside-the-deck
+ * in its own folder (`<deck file>.files/`, `page/pageFile.ts`). The hosted layout uses the former beside-the-deck
  * location and runs through Publish's gather, key scan, sheet, verified upload and records.
  *
  *  - **Publish and Update the page** do the same three things: take the view's text, look and fit steps, write the page
@@ -49,12 +49,12 @@ import { BUILT_IN_THEME, parseTheme, themePathOf, type DeckTheme } from './deckT
 import { deckThemeAndLogo } from './deckPages';
 import type { DeckHostMessage, DeckPageState, DeckPdfKind, DeckNoticeReporter } from './deckProtocol';
 import { loadPageAssets } from './page/pageAssets';
-import { buildDeckPage, deckNameOf, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
+import { buildDeckPage, LOGO_PLACE, nodeFontFs, nodePageFs, pageLogoOf, pagePathFor, pageReadsChanged, readPageMeta, removeDeckPage, removePageFonts, themeFontFiles, writeDeckPage, writePageFonts, type DeckPageNow, type PageFile, type PageFontFile } from './page/pageFile';
 import { deckCounts, deckSheetRows, type DeckSheetRows } from './page/sheetRows';
 import { plainPart } from '../publish/plainText';
 import { HostedDeckLayoutError, type HostedDeckPage } from '../publish/gather';
 import { DeckPictureFolderTaken, ensureDeckPictureFolder } from './deckPictureFolder';
-import { DECK_EXTENSION, LEGACY_DECK_EXTENSION, deckPictureFolderName } from './deckFileName';
+import { DECK_EXTENSION, LEGACY_DECK_EXTENSION, deckFileOfPictureFolder, deckNameOf, deckPictureFolderName } from './deckFileName';
 
 /** How long after the deck stops changing the chip asks again whether the page has changed. */
 const CHANGED_MS = 800;
@@ -712,30 +712,25 @@ export class DeckPublisher implements vscode.Disposable {
   private async hostedPageForBrowser(pagePath: string): Promise<HostedDeckPage | undefined> {
     const folder = path.dirname(pagePath);
     const name = path.basename(pagePath, '.html');
-    if (path.basename(folder) !== `${name} files`) return undefined;
+    const deckFile = deckFileOfPictureFolder(path.basename(folder));
+    if (deckFile === undefined || deckNameOf(deckFile) !== name) return undefined;
     const bytes = await fs.promises.readFile(pagePath);
     const cached = this.written.get(normalizeForCompare(pagePath));
     if (cached?.hostedDeck && cached.localSha === createHash('sha256').update(bytes).digest('hex')) return cached.hostedDeck;
     const record = await this.feature?.controller.recordFor(pagePath);
     if (!record?.deckFolder && !readPageMeta(bytes.subarray(0, 4096).toString('utf8')).ritemark) return undefined;
     const beside = path.join(path.dirname(folder), name);
-    let sourcePath: string | undefined;
-    for (const extension of [DECK_EXTENSION, LEGACY_DECK_EXTENSION]) {
-      const deckPath = beside + extension;
-      const saved = await fs.promises.readFile(deckPath, 'utf8').catch(() => undefined);
-      if (saved === undefined) continue;
-      sourcePath ??= deckPath;
-      const source = { uri: vscode.Uri.file(deckPath), getText: () => saved };
-      const measured = this.savedFit(deckPath, saved);
-      const fits = [measured, record?.deckFit].filter((fit): fit is readonly number[] => Boolean(fit?.length));
-      for (const steps of [...fits, []]) {
-        const built = await this.buildPage(source, splitFrontMatter(saved).content, frontMatterLook(saved), steps, pagePath);
-        if (bytes.equals(Buffer.from(built.html))) return this.hostedDeck(`${beside}.html`, built);
-      }
+    const deckPath = path.join(path.dirname(folder), deckFile);
+    const saved = await fs.promises.readFile(deckPath, 'utf8').catch(() => undefined);
+    if (saved === undefined) throw new HostedDeckLayoutError('Find the source deck and choose Publish to update this page.');
+    const source = { uri: vscode.Uri.file(deckPath), getText: () => saved };
+    const measured = this.savedFit(deckPath, saved);
+    const fits = [measured, record?.deckFit].filter((fit): fit is readonly number[] => Boolean(fit?.length));
+    for (const steps of [...fits, []]) {
+      const built = await this.buildPage(source, splitFrontMatter(saved).content, frontMatterLook(saved), steps, pagePath);
+      if (bytes.equals(Buffer.from(built.html))) return this.hostedDeck(`${beside}.html`, built);
     }
-    throw new HostedDeckLayoutError(sourcePath
-      ? `This page is made from “${plainPart(path.basename(sourcePath))}”. Open the deck and choose Publish to update it.`
-      : 'Find the source deck and choose Publish to update this page.');
+    throw new HostedDeckLayoutError(`This page is made from “${plainPart(deckFile)}”. Open the deck and choose Publish to update it.`);
   }
 
   // ------------------------------------------------------------------ Save as PDF (Sprint 170)
@@ -820,8 +815,12 @@ export class DeckPublisher implements vscode.Disposable {
       // Sprint 172: the deck beside is `<name>.rtms` or an older `<name>.deck.md`; should both be there, the one this
       // page reads as made from (review of #949).
       const folder = path.dirname(pagePath);
-      const base = path.join(path.basename(folder) === `${name} files` ? path.dirname(folder) : folder, name);
-      for (const besidePath of [`${base}${DECK_EXTENSION}`, `${base}${LEGACY_DECK_EXTENSION}`]) {
+      const deckFile = deckFileOfPictureFolder(path.basename(folder));
+      const base = path.join(folder, name);
+      const sources = deckFile !== undefined && deckNameOf(deckFile) === name
+        ? [path.join(path.dirname(folder), deckFile)]
+        : [`${base}${DECK_EXTENSION}`, `${base}${LEGACY_DECK_EXTENSION}`];
+      for (const besidePath of sources) {
         const open = await this.openDocumentAt(besidePath);
         const text = open ? open.getText() : await fs.promises.readFile(besidePath, 'utf8').catch(() => null);
         if (text === null) continue;

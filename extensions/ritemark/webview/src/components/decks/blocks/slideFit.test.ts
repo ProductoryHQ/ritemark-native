@@ -137,7 +137,7 @@ function fakeFlow(options: { room?: number; width?: number; height: (fit: number
 // The layout harness has no browser geometry. The stage shares the renderer's centring rule once
 // its editable placeholder is out of the flex flow.
 {
-  const markdown = '![](<Pictures files/large.png>)'
+  const markdown = '![](<Pictures.rtms.files/large.png>)'
   const pictureDoc = loadSlide(markdown)
   const title = pictureDoc.type.schema.nodes.heading.create({ level: 1 })
   const doc = pictureDoc.copy(pictureDoc.content.addToStart(title))

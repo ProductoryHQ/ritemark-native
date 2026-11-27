@@ -6,7 +6,7 @@
  *  - `picture/make` (`PictureRequest`): the picture made and saved beside the file.
  *  - `picture/cancel` {requestId}: stops that request's turn.
  *  - Answers `picture/status` {requestId, state: 'ready' | 'sign-in' | 'made' | 'failed' | 'cancelled', path?, url?,
- *    problem?}. The editor that asked places a made picture itself (a deck's path is `<deck name> files/…`, a document's
+ *    problem?}. The editor that asked places a made picture itself (a deck's path is `<deck file>.files/…`, a document's
  *    `./images/…`, as their pasted pictures).
  *
  * A dev run's stand-in (`RITEMARK_PICTURE_STANDIN`, a PNG's path, only in a development build with `VSCODE_DEV=1`):

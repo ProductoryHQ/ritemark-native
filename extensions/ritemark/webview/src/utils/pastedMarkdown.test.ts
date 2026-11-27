@@ -68,7 +68,7 @@ for (const [name, load, save] of [
   })
 
   test(`${name} internal copy and paste keeps Markdown spelling`, () => {
-    const written = `Before\n\n___\n\n![cat](<${src}>)\n\n![](image(1).png "Cap")\n\n![](Kickoff%20files/a.png)`
+    const written = `Before\n\n___\n\n![cat](<${src}>)\n\n![](image(1).png "Cap")\n\n![](Kickoff%20Planning.rtms.files/a.png)`
     const doc = load(written)
     const copyProps = pipeline.markdownClipboardProps(doc.type.schema)
     const view = clipboardView(doc.type.schema, copyProps)

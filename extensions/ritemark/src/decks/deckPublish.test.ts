@@ -97,7 +97,7 @@ const fernPath = path.join(themes, 'Fern.theme.md');
 const paperPath = path.join(themes, 'Paper.theme.md');
 const logoPath = path.join(themes, 'Fern logo.svg');
 const deckPath = path.join(root, 'Training', 'Intro.deck.md');
-const pagePath = path.join(root, 'Training', 'Intro files', 'Intro.html');
+const pagePath = path.join(root, 'Training', 'Intro.deck.md.files', 'Intro.html');
 
 const themeText = (fields: { name?: string; accent?: string; heading?: string; logo?: boolean } = {}) => `---
 name: ${fields.name ?? 'Fern'}
@@ -192,7 +192,7 @@ async function main(): Promise<void> {
     const deckFolder = path.dirname(pagePath);
     fs.writeFileSync(deckFolder, 'a person’s file');
     await publish();
-    assert.match(notices.shift() ?? '', /“Intro files” beside this deck is a file, not a folder/);
+    assert.match(notices.shift() ?? '', /“Intro\.deck\.md\.files” beside this deck is a file, not a folder/);
     assert.equal(fs.readFileSync(deckFolder, 'utf8'), 'a person’s file');
     fs.unlinkSync(deckFolder);
 

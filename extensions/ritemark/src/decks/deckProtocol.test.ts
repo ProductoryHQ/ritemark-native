@@ -6,7 +6,7 @@ import { decodeDeckRequest, decodeLibraryRequest, DeckProtocolError, MAX_ASSET_P
 import { deckModeOf, isDeckPath, ModeFixedPerView } from './deckMode';
 import { isThemePath } from './deckTheme';
 
-assert.deepEqual(decodeDeckRequest({ type: 'deck/assets', paths: ['Kickoff files/a.png'] }), { type: 'deck/assets', paths: ['Kickoff files/a.png'] });
+assert.deepEqual(decodeDeckRequest({ type: 'deck/assets', paths: ['Kickoff.rtms.files/a.png'] }), { type: 'deck/assets', paths: ['Kickoff.rtms.files/a.png'] });
 assert.throws(() => decodeDeckRequest({ type: 'deck/assets', paths: ['a.png'], extra: 1 }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/assets', paths: [1] }), DeckProtocolError);
 assert.throws(() => decodeDeckRequest({ type: 'deck/assets', paths: [''] }), DeckProtocolError);

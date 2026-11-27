@@ -25,13 +25,25 @@ export function isDeckPath(fsPath: string): boolean {
 
 /** A deck's name: its file name (or path, with `/` or `\`) without the deck's ending. Any other name is only its base. */
 export function deckNameOf(fileName: string): string {
-  const base = fileName.slice(Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\')) + 1);
-  return base.replace(DECK_ENDING, '');
+  return baseName(fileName).replace(DECK_ENDING, '');
 }
+
+function baseName(fileName: string): string {
+  return fileName.slice(Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\')) + 1);
+}
+
+const DECK_PICTURE_FOLDER_SUFFIX = '.files';
 
 /** The name of the folder beside the deck that holds the files it makes. */
 export function deckPictureFolderName(deckPath: string): string {
-  return `${deckNameOf(deckPath)} files`;
+  return `${baseName(deckPath)}${DECK_PICTURE_FOLDER_SUFFIX}`;
+}
+
+/** The deck filename encoded by a folder name, if it has a supported deck extension. */
+export function deckFileOfPictureFolder(folder: string): string | undefined {
+  if (!folder.endsWith(DECK_PICTURE_FOLDER_SUFFIX)) return undefined;
+  const deck = folder.slice(0, -DECK_PICTURE_FOLDER_SUFFIX.length);
+  return isDeckPath(deck) ? deck : undefined;
 }
 
 /** The folder in a newly saved deck picture's relative path. */
@@ -39,7 +51,7 @@ export function savedDeckPictureFolder(picturePath: string): string | undefined 
   const slash = picturePath.lastIndexOf('/');
   if (slash < 0) return undefined;
   const folder = picturePath.slice(0, slash);
-  return folder.endsWith(' files') ? folder : undefined;
+  return deckFileOfPictureFolder(folder) ? folder : undefined;
 }
 
 /** A new deck's file name: `<name>.rtms`. */

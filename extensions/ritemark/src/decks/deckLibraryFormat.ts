@@ -111,7 +111,7 @@ const HTML_PICTURE = /(<img\b[^>]*?(?<![\w-])src\s*=\s*)(["'])([^"'>]*)\2/gi;
 /** A reference picture's use: `![alt][label]`, `![label][]` or `![label]`. */
 const REFERENCE_PICTURE = /!\[((?:[^[\]]|\[[^\]]*\])*)\](?:\[([^\]]*)\])?/g;
 /** A link reference definition: `[label]: target "title"`, also inside a quote or a list item. */
-const DEFINITION = /^([ \t]*(?:>[ \t]*)*(?:(?:[-*+]|\d{1,9}[.)])[ \t]+)?\[([^\]]+)\]:[ \t]*)(<[^>\n]*>|\S+)(.*)$/;
+const DEFINITION = /^([ \t]*(?:(?:>|(?:[-*+]|\d{1,9}[.)])[ \t])[ \t]*)*\[((?!\^)(?:\\[\\[\]]|[^\[\]\\]|\\(?![\\[\]]))+)\]:[ \t]*)(<(?:\\[<>\\]|[^<>\\\r\n]|\\(?![<>\\]))*>|[^\s<>]+)((?:[ \t]+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\((?:\\.|[^()\\])*\)))?[ \t]*\r?)$/;
 
 /** A target rewritten, in the form it was written: angle brackets kept, or added when the new path has a space. */
 function rewrittenTarget(target: string, rewrite: (target: string) => string): string {

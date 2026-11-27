@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     '',
   ].join('\n');
   const steps: string[] = [];
-  const folders = new Map<string, string[]>([['Clients/Harbour/AI assistants files', ['side.png']]]);
+  const folders = new Map<string, string[]>([['Clients/Harbour/AI assistants.deck.md.files', ['side.png']]]);
   const copyFolder = async (from: string, to: string) => {
     const pictures = folders.get(from);
     if (!pictures || folders.has(to)) return false;
@@ -203,7 +203,7 @@ async function main(): Promise<void> {
   let deckText = emptyDeckText(() => 0.5);
   const result = await copyEarlierDeck('Clients/Harbour/AI assistants.deck.md', {
     deck: 'Courses/Untitled.rtms',
-    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source.replace('images/cover.png', 'AI assistants files/side.png') : null),
+    read: async relative => (relative === 'Clients/Harbour/AI assistants.deck.md' ? source.replace('images/cover.png', 'AI assistants.deck.md.files/side.png') : null),
     taken: fileName => fileName === 'AI assistants (copy).rtms',
     copyFolder,
     updateCopy: async (_relative, before, after) => { assert.equal(deckText, before); deckText = after; },
@@ -216,8 +216,8 @@ async function main(): Promise<void> {
   assert.equal(copiedNotice('AI assistants'), 'This deck is now a copy of AI assistants.');
   const copied = parseDeck(deckText);
   assert.deepEqual({ theme: copied.theme, look: /^look: borderless$/m.test(deckText), slides: copied.slides.length }, { theme: 'Slide library/Themes/Evening.theme.md', look: true, slides: 2 });
-  assert.equal(parseSlideBody(copied.slides[0].body).image, 'AI assistants (copy 2) files/side.png');
-  assert.deepEqual(folders.get('Courses/AI assistants (copy 2) files'), ['side.png']);
+  assert.equal(parseSlideBody(copied.slides[0].body).image, 'AI assistants (copy 2).rtms.files/side.png');
+  assert.deepEqual(folders.get('Courses/AI assistants (copy 2).rtms.files'), ['side.png']);
   assert.match(deckText, /\[the brief\]\(\.\.\/Clients\/Harbour\/Brief\.md\)/);
   // Gone meanwhile: nothing changes, and the bar says why
   const gone: string[] = [];
