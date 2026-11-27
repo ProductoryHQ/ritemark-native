@@ -28,6 +28,7 @@ import { gitIgnored as defaultGitIgnored, GitIgnoredFn } from './gitIgnore';
 import { cssReferences, moduleReferences, pageReferences, Reference, rewritePageAssets, scriptBuildsReferences } from './references';
 import { plainPart } from './plainText';
 import { cleanPicture, hasPictureSignature } from './pictureClean';
+import { KIND_BY_EXTENSION } from './fileKinds';
 import { isText, scanText } from './secretScan';
 import {
   FileKind,
@@ -69,15 +70,6 @@ export interface GatherOptions {
   readFile?: (p: string) => Promise<Buffer>;
   gitIgnored?: GitIgnoredFn;
 }
-
-const KIND_BY_EXTENSION: Record<string, FileKind> = {
-  '.png': 'picture', '.jpg': 'picture', '.jpeg': 'picture', '.gif': 'picture', '.webp': 'picture', '.avif': 'picture',
-  '.heic': 'picture', '.heif': 'picture', '.jxl': 'picture', '.svgz': 'picture',
-  '.svg': 'picture', '.ico': 'picture', '.bmp': 'picture', '.apng': 'picture', '.tif': 'picture', '.tiff': 'picture',
-  '.css': 'style',
-  '.js': 'script', '.mjs': 'script', '.cjs': 'script',
-  '.woff': 'font', '.woff2': 'font', '.ttf': 'font', '.otf': 'font', '.eot': 'font',
-};
 
 export function kindOf(p: string): FileKind {
   if (isPagePath(p)) return 'page';

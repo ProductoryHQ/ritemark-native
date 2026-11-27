@@ -206,6 +206,28 @@ async function main() {
     assert.deepEqual(found(indexer, 'card'), []);
   }
 
+  {
+    const fs = new MemoryFs();
+    const folder = `${ROOT}/Kickoff.rtms.files`;
+    const note = `${folder}/readme.md`;
+    const page = `${folder}/Kickoff.html`;
+    fs.write(`${ROOT}/Kickoff.rtms`, 'Meeting');
+    fs.write(note, 'zebra');
+    fs.write(page, 'aardvark');
+    const clock = new Clock();
+    const { indexer, config } = makeIndexer(fs, clock);
+    await indexer.start(config);
+    assert.deepEqual(found(indexer, 'zebra'), ['readme']);
+    assert.deepEqual(found(indexer, 'aardvark'), []);
+
+    fs.write(note, 'giraffe');
+    fs.write(page, 'meerkat');
+    indexer.onEvents([{ kind: 'changed', path: note }, { kind: 'changed', path: page }]);
+    await clock.advance(FIRST_LOOK_MS + SETTLE_MS);
+    assert.deepEqual(found(indexer, 'giraffe'), ['readme']);
+    assert.deepEqual(found(indexer, 'meerkat'), []);
+  }
+
   // ── The limits: the newest first, the rest by name (R1) ────────────────────
   {
     const fs = new MemoryFs();

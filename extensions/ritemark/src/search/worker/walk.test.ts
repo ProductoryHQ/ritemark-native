@@ -8,7 +8,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { cloudState, inOneDriveFolder, oneDriveRootsFromEnv } from './cloudFiles';
-import { ABOUT_THIS_PROJECT, RootRules, classifyPath, globToRegExp, isRuleFile, walkProject, type WalkFs, type WalkStat } from './walk';
+import { ABOUT_THIS_PROJECT, RootRules, classifyPath, globToRegExp, isRuleFile, walkProject, walkTree, type FoundDocument, type WalkFs, type WalkStat } from './walk';
 
 const pause = () => Promise.resolve();
 
@@ -86,6 +86,10 @@ async function main() {
 
     await write(root, 'Kickoff.rtms');
     await write(root, 'Kickoff.rtms.files/Kickoff.html');
+    await write(root, 'Kickoff.rtms.files/readme.md');
+    await write(root, 'Kickoff.rtms.files/sub/Inner.rtms');
+    await write(root, 'Kickoff.rtms.files/sub/logos/notes.md');
+    await write(root, 'Kickoff.rtms.files/logos/internal.md');
     await write(root, 'Kickoff.rtms.files/fonts/internal.md');
     await write(root, 'Notes.rtms.files/x.md');
 
@@ -103,6 +107,9 @@ async function main() {
       'AGENTS.md',
       'Budget.CSV',
       'Kickoff.rtms',
+      'Kickoff.rtms.files/readme.md',
+      'Kickoff.rtms.files/sub/Inner.rtms',
+      'Kickoff.rtms.files/sub/logos/notes.md',
       'Linked note.md',
       'Notes.md',
       'Notes.rtms.files/x.md',
@@ -133,12 +140,18 @@ async function main() {
 
     // The watcher's events are judged by the same rules.
     const rules = rulesOut.get(root)!;
+    assert.equal((await classifyPath(path.join(root, 'Kickoff.rtms.files/readme.md'), rules, nodeFs))?.name, 'readme');
+    assert.equal(await classifyPath(path.join(root, 'Kickoff.rtms.files/Kickoff.html'), rules, nodeFs), null);
+    assert.equal(await classifyPath(path.join(root, 'Kickoff.rtms.files/fonts/internal.md'), rules, nodeFs), null);
     assert.equal((await classifyPath(path.join(root, 'team/deep/Minutes.md'), rules, nodeFs))?.name, 'Minutes');
     assert.equal(await classifyPath(path.join(root, 'team/private/Secret.md'), rules, nodeFs), null, 'inside an ignored folder');
     assert.equal(await classifyPath(path.join(root, '.claude/notes.md'), rules, nodeFs), null, 'a dot folder');
     assert.equal(await classifyPath(path.join(root, 'build/out.md'), rules, nodeFs), null);
     assert.equal(await classifyPath(path.join(root, 'image.png'), rules, nodeFs), null, 'not a kind search reads');
     assert.equal(await classifyPath(path.join(root, 'gone.md'), rules, nodeFs), null, 'gone');
+    const subtree: FoundDocument[] = [];
+    await walkTree(rules, path.join(root, 'Kickoff.rtms.files'), nodeFs, subtree, 100, pause);
+    assert.deepEqual(subtree.map(doc => doc.relativePath).sort(), found.filter(file => file.startsWith('Kickoff.rtms.files/')));
     assert.ok(isRuleFile(path.join(root, 'team/.gitignore'), root));
     assert.ok(isRuleFile(path.join(root, '.git/info/exclude'), root));
     assert.ok(!isRuleFile(path.join(root, 'Notes.md'), root));

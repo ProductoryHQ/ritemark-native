@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A deck's own folder is now named after the deck file (`Kickoff.rtms.files`). It follows the deck, or goes to the Trash with it, only when it holds nothing but the deck's pictures and its published page. A folder with other files stays where it is.
+- Home's folder card no longer counts a deck's pictures and published page as the project's files, and Search and Home show a note you keep in a deck's folder (#1121).
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).

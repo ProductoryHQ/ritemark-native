@@ -63,6 +63,45 @@ for (const file of ['Brief.docx', 'CLAUDE.md', 'AGENTS.md', '.DS_Store', 'Sub/Pl
   assert.equal(capped.more, true, 'the walk stops past its limit');
   fs.rmSync(tmp, { recursive: true, force: true });
 
+  const project = makeTempDir('rm-deck-counts-');
+  try {
+    for (const file of ['Kickoff.rtms', 'Kickoff.rtms.files/photo.png', 'Kickoff.rtms.files/readme.md', 'Kickoff.rtms.files/Kickoff.html', 'Kickoff.rtms.files/fonts/X.woff2', 'Kickoff.rtms.files/logos/l.svg', 'Notes.md', 'Notes.files/zebra.md']) {
+      const target = path.join(project, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'x');
+    }
+    const { names, more } = await listFileNames(project);
+    assert.deepEqual(names.sort(), ['Kickoff.rtms', 'Notes.md', 'readme.md', 'zebra.md']);
+    assert.equal(countsLine(names, more, { decks: true }), '4 files: 3 text documents and 1 deck.');
+    assert.equal(countsLine(names, more, { decks: false }), '4 files: 4 text documents.');
+
+    for (const file of [
+      'Kickoff.rtms.files/logos/logo.png',
+      'Kickoff.deck.md',
+      'Kickoff.deck.md.files/photo.png',
+      'Sales/Pitch.rtms',
+      'Sales/Pitch.rtms.files/a.png',
+    ]) {
+      const target = path.join(project, file);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, 'x');
+    }
+    const expanded = await listFileNames(project);
+    assert.deepEqual(expanded.names.sort(), ['Kickoff.deck.md', 'Kickoff.rtms', 'Notes.md', 'Pitch.rtms', 'readme.md', 'zebra.md']);
+
+    if (process.platform !== 'win32') {
+      fs.symlinkSync('Kickoff.rtms', path.join(project, 'Linked.rtms'));
+      const linkedFolder = path.join(project, 'Linked.rtms.files');
+      fs.mkdirSync(linkedFolder);
+      fs.writeFileSync(path.join(linkedFolder, 'linked.html'), 'x');
+      fs.writeFileSync(path.join(linkedFolder, 'linked.md'), 'x');
+      const linked = await listFileNames(project);
+      assert.deepEqual(linked.names.sort(), [...expanded.names, 'Linked.rtms', 'linked.md'].sort());
+    }
+  } finally {
+    fs.rmSync(project, { recursive: true, force: true });
+  }
+
   // ── The ready request's kind and words (R3, S10, S13, S14, S16) ──
 
   assert.equal(readyKindOf({ empty: false, sample: false }), 'files');
