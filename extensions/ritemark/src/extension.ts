@@ -487,6 +487,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerFeedback(context, {
     appVersion: String(context.extension.packageJSON.version ?? 'unknown'),
     lastAnswer: () => unifiedViewProvider.lastAnswerOfOpenChat(),
+    answerOfTurn: ref => unifiedViewProvider.answerOfTurn(ref),
     openReportWindow: () => unifiedViewProvider.openReportWindow(),
   });
   registerFeedbackStatusBar(context);

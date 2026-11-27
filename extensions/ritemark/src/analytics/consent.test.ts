@@ -203,6 +203,25 @@ async function main(): Promise<void> {
     assert.equal(await noKey.gate.sendFeedback(feedback), false);
   }
 
+  for (const setting of [true, false, undefined]) {
+    const h = harness({ setting });
+    const feedback = { name: 'feedback_sent' as const, properties: { message: 'Explicit words', from: 'failure_card' as const } };
+    assert.equal(await h.gate.sendFeedback([feedback]), true);
+    assert.deepEqual(h.sent.find(event => event.event === 'feedback_sent'), {
+      event: 'feedback_sent',
+      distinctId: setting ? 'anon-1' : 'one-off-1',
+      properties: {
+        message: 'Explicit words',
+        ...(setting ? { from: 'failure_card', product_area: 'app', app_version: '2.0.0-0', build_channel: 'prod' } : {}),
+        $process_person_profile: false,
+        $geoip_disable: true,
+      },
+    });
+    assert.equal(await h.gate.track('feedback_opened', { from: 'thumb' }), Boolean(setting));
+    assert.equal(await h.gate.track('ai_answer_reacted', { reaction: 'none', ai: 'codex' }), Boolean(setting));
+    if (!setting) assert.equal(h.sent.length, 1);
+  }
+
   // ── Sprint 140 (R13, R14, R15; S51, S64, S68): sent only when accepted; the card's question; the new counts ──
   {
     const week = [{ name: 'feedback_sent' as const, properties: { message: 'A proposal for Harbour', asked: 'made_this_week' as const } }];

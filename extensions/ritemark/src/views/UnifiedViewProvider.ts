@@ -112,7 +112,7 @@ import type {
   CommentTaskRoutingFacts,
   CommentTaskRuntimeSettings,
 } from '../commentTasks/CommentTaskController';
-import { showBriefToast } from '../feedback/feedbackSheet';
+import { showBriefToast, type FeedbackTurnRef } from '../feedback/feedbackSheet';
 import {
   bringDocumentForward,
   chatDocumentsFor,
@@ -2216,12 +2216,19 @@ export class UnifiedViewProvider implements vscode.WebviewViewProvider {
    */
   public async lastAnswerOfOpenChat(): Promise<{ title: string; text: string } | null> {
     const conversationId = this._activeConversationId;
-    if (!conversationId) return null;
+    return conversationId ? this.answerOfConversation(conversationId) : null;
+  }
+
+  public async answerOfTurn({ conversationId, turnId }: FeedbackTurnRef): Promise<{ title: string; text: string } | null> {
+    return this.answerOfConversation(conversationId, turnId);
+  }
+
+  private async answerOfConversation(conversationId: string, turnId?: string): Promise<{ title: string; text: string } | null> {
     try {
       const record = await this._conversationController.runtimeConversation(conversationId);
       for (let index = record.events.length - 1; index >= 0; index -= 1) {
         const event = record.events[index];
-        if (event.kind === 'assistant-message' && event.terminalStatus === 'completed' && event.content.trim()) {
+        if ((turnId === undefined || event.turnId === turnId) && event.kind === 'assistant-message' && event.terminalStatus === 'completed' && event.content.trim()) {
           return { title: record.title, text: event.content };
         }
       }
