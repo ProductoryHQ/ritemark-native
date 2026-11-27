@@ -19,7 +19,7 @@ export interface DeckFolderFiles {
   rename(from: string, to: string): Promise<void>;
   trash(folder: string): Promise<void>;
   copy: CopyDeckFolder;
-  notice(message: string): void;
+  notice(message: string, level: 'information' | 'warning'): void;
 }
 
 export function ownDeckFolder(deck: string): string {
@@ -47,33 +47,37 @@ function linksInto(files: Iterable<string>, folder: string): boolean {
 
 const FOLDER_ENTRY_LIMIT = 500;
 const OS_CLUTTER = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
-const UNUSED_FILES = "it holds files the deck doesn't use.";
+const OTHER_FILES = "it holds more than the deck's pictures and published page.";
 
 async function deckFolderOwnership(
   deck: string, text: string, folder: string, fs: DeckFolderFiles,
 ): Promise<'unlinked' | 'foreign' | 'owned'> {
   const linked = linkedFiles(text, folderOf(deck), true);
-  if (!linksInto(linked, folder)) return 'unlinked';
+  let linkedIntoFolder = linksInto(linked, folder);
+  const owned = new Set([...linked].filter(file => kindOf(file) === 'picture'));
 
-  const page = folder + '/' + deckNameOf(deck) + '.html';
   const files = new Set<string>();
   const pending = [folder];
   let count = 0;
+  let hasOtherEntries = false;
   try {
     while (pending.length) {
       const dir = pending.pop()!;
       for await (const entry of fs.listFolder(dir)) {
-        if (++count > FOLDER_ENTRY_LIMIT || entry.kind === 'other') return 'foreign';
+        if (++count > FOLDER_ENTRY_LIMIT) return 'foreign';
         const file = dir + '/' + entry.name;
         if (entry.kind === 'folder') pending.push(file);
-        else files.add(file);
+        else if (entry.kind === 'file') files.add(file);
+        else hasOtherEntries = true;
       }
     }
 
-    if (files.has(page)) {
+    for (const page of files) {
+      if (folderOf(page) !== folder || path.posix.extname(page).toLowerCase() !== '.html') continue;
       const html = await fs.readPage(page);
-      if (!readPageMeta(html).ritemark) return 'foreign';
-      linked.add(page);
+      if (!readPageMeta(html).ritemark) continue;
+      linkedIntoFolder = true;
+      owned.add(page);
       const { refs, inlineCss } = pageReferences(html);
       for (const ref of [...refs, ...inlineCss.flatMap(cssReferences)]) {
         if (ref.as !== 'picture' && ref.as !== 'any') continue;
@@ -83,10 +87,11 @@ async function deckFolderOwnership(
         const file = normalizePath(folder + '/' + decodeURIComponent(address));
         if (file === null || !inside(file, folder)) continue;
         const kind = kindOf(file);
-        if (kind === 'picture' || (kind === 'font' && inside(file, folder + '/' + PAGE_FONT_FOLDER))) linked.add(file);
+        if (kind === 'picture' || (kind === 'font' && inside(file, folder + '/' + PAGE_FONT_FOLDER))) owned.add(file);
       }
     }
-    return [...files].every(file => linked.has(file) || OS_CLUTTER.has(path.posix.basename(file))) ? 'owned' : 'foreign';
+    if (!linkedIntoFolder) return 'unlinked';
+    return !hasOtherEntries && [...files].every(file => owned.has(file) || OS_CLUTTER.has(path.posix.basename(file))) ? 'owned' : 'foreign';
   } catch {
     return 'foreign';
   }
@@ -99,10 +104,10 @@ export async function followDeckMoves(
 ): Promise<DeckMove[]> {
   const result = [...moves];
   const reported = new Set<string>();
-  const stayed = (folder: string, reason: string) => {
+  const stayed = (folder: string, reason: string, level: 'information' | 'warning' = 'information') => {
     if (reported.has(folder)) return;
     reported.add(folder);
-    fs.notice(`“${path.posix.basename(folder)}” stayed where it was, because ${reason}`);
+    fs.notice(`“${path.posix.basename(folder)}” stayed where it was, because ${reason}`, level);
   };
   for (const deck of decks) {
     if (!isDeckPath(deck.from) || !isDeckPath(deck.to)) continue;
@@ -117,7 +122,7 @@ export async function followDeckMoves(
     if (inside(deck.to, from)) {
       stayed(from, 'the deck was moved into it.');
     } else if (ownership === 'foreign') {
-      stayed(from, UNUSED_FILES);
+      stayed(from, OTHER_FILES, 'information');
     } else if (await fs.kind(to) && !(await fs.sameFolder?.(from, to))) {
       stayed(from, `“${path.posix.basename(to)}” is already there. The deck's pictures still show.`);
     } else {
@@ -125,7 +130,7 @@ export async function followDeckMoves(
         await fs.rename(from, to);
         result.push({ from, to });
       } catch {
-        stayed(from, "it couldn't be moved. The deck's pictures still show.");
+        stayed(from, "it couldn't be moved. The deck's pictures still show.", 'warning');
       }
     }
   }
@@ -145,7 +150,7 @@ export async function trashDeckFolders(decks: readonly DeletedDeck[], deleted: r
     handled.add(folder);
     const name = path.posix.basename(folder);
     if (ownership === 'foreign') {
-      fs.notice(`“${name}” stayed where it was, because ${UNUSED_FILES}`);
+      fs.notice(`“${name}” stayed where it was, because ${OTHER_FILES}`, 'information');
       continue;
     }
     const dir = folderOf(deck);
@@ -162,10 +167,10 @@ export async function trashDeckFolders(decks: readonly DeletedDeck[], deleted: r
     try {
       await fs.trash(folder);
     } catch {
-      fs.notice(`“${name}” stayed where it was, because it couldn't be moved to the Trash.`);
+      fs.notice(`“${name}” stayed where it was, because it couldn't be moved to the Trash.`, 'warning');
       continue;
     }
-    fs.notice(`“${name}” went to the Trash with the deck.`);
+    fs.notice(`“${name}” went to the Trash with the deck.`, 'information');
   }
 }
 

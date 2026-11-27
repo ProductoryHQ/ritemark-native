@@ -36,12 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Publishing a deck writes its local page and any theme fonts or logo it uses into `<deck> files/`. Updating an existing published deck keeps its public link when the files fit its current hosted layout.
+- Publishing a deck writes its local page and any theme fonts or logo it uses into `<deck file>.files/`. Updating an existing published deck keeps its public link when the files fit its current hosted layout.
 - Gemini 4 Neon replaces Gemini 4 Argon for new Google Gemini and OpenRouter selections. Saved Argon selections still work (#1062).
 
 ### Fixed
 
-- A deck's own folder is now named after the deck file (`Kickoff.rtms.files`), and deleting or renaming a deck leaves any other folder alone unless it holds only that deck's pictures.
+- A deck's own folder is now named after the deck file (`Kickoff.rtms.files`). It follows the deck, or goes to the Trash with it, only when it holds nothing but the deck's pictures and its published page. A folder with other files stays where it is.
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).
 - You can now attach Word, Excel, and PowerPoint files with the paperclip in AI chat (#987).

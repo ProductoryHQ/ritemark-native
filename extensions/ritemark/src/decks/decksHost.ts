@@ -310,7 +310,10 @@ const deckFolderFiles: CreatedDeckFiles = {
     // Create-only, entry by entry into the reserved name (copyDeckFolder: Electron's fs.cp refuses an existing target).
     return copyDeckFolder(fileUri(from).fsPath, fileUri(to).fsPath);
   },
-  notice(message) { void vscode.window.showWarningMessage(message); },
+  notice(message, level) {
+    if (level === 'information') void vscode.window.showInformationMessage(message);
+    else void vscode.window.showWarningMessage(message);
+  },
 };
 
 /** Rebase the moved decks after the folders have followed, including moves named by Documents itself. */

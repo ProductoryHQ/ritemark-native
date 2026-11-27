@@ -16,13 +16,22 @@ const original = 'work/Kickoff.rtms';
 const assets = 'work/Kickoff.rtms.files';
 const text = '---\ndeck: 1\n---\n\n```slide title\nid: a1\ntitle: Kickoff\nimage: Kickoff.rtms.files/x.png\n```\n\n![](<Kickoff.rtms.files/y.png>)\n\n![](other.png)\n';
 const trashed = '“Kickoff.rtms.files” went to the Trash with the deck.';
-const kept = "“Kickoff.rtms.files” stayed where it was, because it holds files the deck doesn't use.";
+const kept = "“Kickoff.rtms.files” stayed where it was, because it holds more than the deck's pictures and published page.";
+const pageMark = `<meta name="generator" content="${GENERATOR_META}"><meta name="${DIGEST_META}" content="${'a'.repeat(64)}">`;
+const handout = [
+  '[^1]: Smith 2020, p. 4',
+  '- [Tip]: Use the keyboard',
+  '> [brief]: <Kickoff.rtms.files/a b.docx> "Brief"',
+  '- [x]: ../a.md',
+  "[single]: ../a.md 'A title'",
+  '[paren]: ../a.md (A title)',
+].join('\r\n') + '\r\n';
 
 function fixture() {
   const content = new Map([[original, text], [assets + '/x.png', 'x'], [assets + '/y.png', 'y']]);
   const folders = new Set([assets]);
   const changes: string[] = [];
-  const notices: string[] = [];
+  const notices: Array<[string, 'information' | 'warning']> = [];
   const logs: string[] = [];
   const searches: Array<{ glob: string; limit: number }> = [];
   const fs: CreatedDeckFiles = {
@@ -53,6 +62,11 @@ function fixture() {
     rename: async (from, to) => {
       assert.ok(folders.delete(from));
       folders.add(to);
+      for (const folder of [...folders]) {
+        if (!folder.startsWith(from + '/')) continue;
+        folders.delete(folder);
+        folders.add(to + folder.slice(from.length));
+      }
       changes.push(`rename ${from} to ${to}`);
       for (const [file, bytes] of [...content]) {
         if (!file.startsWith(from + '/')) continue;
@@ -64,21 +78,24 @@ function fixture() {
     copy: async (from, to) => {
       if (!folders.has(from) || folders.has(to) || content.has(to)) return false;
       folders.add(to);
+      for (const folder of [...folders]) {
+        if (folder.startsWith(from + '/')) folders.add(to + folder.slice(from.length));
+      }
       for (const [file, bytes] of [...content]) {
         if (file.startsWith(from + '/')) content.set(to + file.slice(from.length), bytes);
       }
       return true;
     },
-    notice: message => { notices.push(message); },
+    notice: (message, level) => { notices.push([message, level]); },
   };
   return { fs, content, folders, changes, notices, searches, logs };
 }
 
-async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, direct = true) {
+async function rebase(fs: DeckFolderFiles, moves: DeckMove[], deck: DeckMove, direct = true, saved = text) {
   const readDeck = fs.readDeck;
-  fs.readDeck = async file => file === deck.to ? text : readDeck(file);
+  fs.readDeck = async file => file === deck.to ? saved : readDeck(file);
   const after = placeAfterMoves(await followDeckMoves(moves, direct ? [deck] : [], fs));
-  return rewriteDeckPictures(text, target => movedTarget(target, folderOf(deck.from), folderOf(deck.to), after));
+  return rewriteDeckPictures(saved, target => movedTarget(target, folderOf(deck.from), folderOf(deck.to), after), true);
 }
 
 test('rename in place follows the deck and rebases both picture forms', async () => {
@@ -95,6 +112,17 @@ test('move carries the folder and keeps its links, rebasing pictures left behind
   assert.deepEqual(changes, ['rename work/Kickoff.rtms.files to work/archive/Kickoff.rtms.files']);
 });
 
+test('a move rebases reference definitions and preserves footnotes and list prose', async () => {
+  const { fs, content, changes, notices } = fixture();
+  const move = { from: original, to: 'work/archive/Kickoff.rtms' };
+  content.set(assets + '/a b.docx', 'brief');
+  assert.equal(await rebase(fs, [move], move, true, text + handout),
+    text.replaceAll('Kickoff.rtms.files/', '../Kickoff.rtms.files/').replace('other.png', '../other.png') +
+    handout.replace('<Kickoff.rtms.files/', '<../Kickoff.rtms.files/').replaceAll('../a.md', '../../a.md'));
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [[kept, 'information']]);
+});
+
 test('explicit folder and parent moves are already accounted for', async () => {
   const { fs, changes } = fixture();
   const move = { from: original, to: 'archive/Kickoff.rtms' };
@@ -109,7 +137,7 @@ test('taken folder name leaves the pictures in place and gives one notice', asyn
   const move = { from: original, to: 'work/archive/Kickoff.rtms' };
   assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff.rtms.files/', '../Kickoff.rtms.files/').replace('other.png', '../other.png'));
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, ["“Kickoff.rtms.files” stayed where it was, because “Kickoff.rtms.files” is already there. The deck's pictures still show."]);
+  assert.deepEqual(notices, [["“Kickoff.rtms.files” stayed where it was, because “Kickoff.rtms.files” is already there. The deck's pictures still show.", 'information']]);
 });
 
 test('a rename onto a taken folder name names the taken name', async () => {
@@ -118,7 +146,7 @@ test('a rename onto a taken folder name names the taken name', async () => {
   const move = { from: original, to: 'work/Review.rtms' };
   await rebase(fs, [move], move);
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, ["“Kickoff.rtms.files” stayed where it was, because “Review.rtms.files” is already there. The deck's pictures still show."]);
+  assert.deepEqual(notices, [["“Kickoff.rtms.files” stayed where it was, because “Review.rtms.files” is already there. The deck's pictures still show.", 'information']]);
 });
 
 test('the folder stays when the deck moves into it', async () => {
@@ -126,7 +154,7 @@ test('the folder stays when the deck moves into it', async () => {
   const move = { from: original, to: assets + '/Kickoff.rtms' };
   assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff.rtms.files/', '').replace('other.png', '../other.png'));
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, ['“Kickoff.rtms.files” stayed where it was, because the deck was moved into it.']);
+  assert.deepEqual(notices, [['“Kickoff.rtms.files” stayed where it was, because the deck was moved into it.', 'information']]);
 });
 
 test('renaming an empty deck leaves a folder of notes silently', async () => {
@@ -145,10 +173,10 @@ test('moving a deck leaves a mixed folder in place and reports once', async () =
   content.set(assets + '/notes.md', 'notes');
   assert.equal(await rebase(fs, [move], move), text.replaceAll('Kickoff.rtms.files/', '../Kickoff.rtms.files/').replace('other.png', '../other.png'));
   assert.deepEqual(changes, []);
-  assert.deepEqual(notices, [kept]);
+  assert.deepEqual(notices, [[kept, 'information']]);
 });
 
-for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'marked page', 'unmarked page', 'symlink', 'unreadable deck', 'unreadable folder', 'too many entries', 'Markdown link'] as const) {
+for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'marked page', 'unmarked page', 'nested page', 'symlink', 'unreadable deck', 'unreadable folder', 'too many entries', 'Markdown link', 'linked document'] as const) {
   test(`delete checks folder ownership with ${scenario}`, async () => {
     const { fs, content, folders, changes, notices } = fixture();
     content.delete(original);
@@ -159,9 +187,18 @@ for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'mar
     if (scenario === 'unreadable deck') saved = undefined;
     if (scenario === 'empty deck' || scenario === 'extra notes') content.set(assets + '/notes.md', 'notes');
     if (scenario === 'Markdown link') saved = '[Picture](<Kickoff.rtms.files/x.png>)';
+    if (scenario === 'linked document') {
+      content.delete(assets + '/x.png');
+      content.set(assets + '/Client brief.docx', 'brief');
+      saved = '[Brief](<Kickoff.rtms.files/Client brief.docx>)';
+    }
+    if (scenario === 'nested page') {
+      folders.add(assets + '/nested');
+      content.set(assets + '/nested/Kickoff.html', pageMark);
+      saved += '\n[Published page](<Kickoff.rtms.files/nested/Kickoff.html>)';
+    }
     if (scenario === 'marked page' || scenario === 'unmarked page') {
-      const mark = `<meta name="generator" content="${GENERATOR_META}"><meta name="${DIGEST_META}" content="${'a'.repeat(64)}">`;
-      content.set(assets + '/Kickoff.html', (scenario === 'marked page' ? mark : '') +
+      content.set(assets + '/Kickoff.html', (scenario === 'marked page' ? pageMark : '') +
         '<style>@font-face{src:url(fonts/X.woff2)}</style><img src="logos/l.svg"><img src="page%20picture%23.png">');
       folders.add(assets + '/fonts');
       folders.add(assets + '/logos');
@@ -186,8 +223,41 @@ for (const scenario of ['empty deck', 'picture and clutter', 'extra notes', 'mar
     const owned = scenario === 'picture and clutter' || scenario === 'marked page' || scenario === 'Markdown link';
     const silent = scenario === 'empty deck' || scenario === 'unreadable deck';
     assert.deepEqual(changes, owned ? ['trash work/Kickoff.rtms.files'] : []);
-    assert.deepEqual(notices, owned ? [trashed] : silent ? [] : [kept]);
+    assert.deepEqual(notices, owned ? [[trashed, 'information']] : silent ? [] : [[kept, 'information']]);
     assert.equal(folders.has(assets), !owned);
+  });
+}
+
+test('a linked document alone triggers the informational notice on move', async () => {
+  const { fs, content, changes, notices } = fixture();
+  const move = { from: original, to: 'archive/Kickoff.rtms' };
+  content.delete(assets + '/x.png');
+  content.delete(assets + '/y.png');
+  content.set(assets + '/Client brief.docx', 'brief');
+  content.set(move.to, '[Brief](<Kickoff.rtms.files/Client brief.docx>)');
+  assert.deepEqual(await followDeckMoves([move], [move], fs), [move]);
+  assert.deepEqual(changes, []);
+  assert.deepEqual(notices, [[kept, 'information']]);
+});
+
+for (const [name, saved] of [['Review', text], ['kickoff', text], ['Text only', emptyDeckText()]] as const) {
+  test(`a published deck renamed to "${name}" takes its page and fonts to the Trash`, async () => {
+    const { fs, content, folders, changes, notices } = fixture();
+    if (name === 'Text only') {
+      content.delete(assets + '/x.png');
+      content.delete(assets + '/y.png');
+    }
+    content.delete(original);
+    content.set(assets + '/Kickoff.html', pageMark + '<style>@font-face{src:url(fonts/X.woff2)}</style>');
+    folders.add(assets + '/fonts');
+    content.set(assets + '/fonts/X.woff2', 'font');
+    const move = { from: original, to: `work/${name}.rtms` };
+    const renamed = `work/${name}.rtms.files`;
+    const rebased = await rebase(fs, [move], move, true, saved);
+    assert.equal(content.has(renamed + '/Kickoff.html'), true);
+    await trashDeckFolders([{ file: move.to, text: rebased }], [move.to], fs);
+    assert.deepEqual(changes, [`rename ${assets} to ${renamed}`, `trash ${renamed}`]);
+    assert.deepEqual(notices, [[`“${name}.rtms.files” went to the Trash with the deck.`, 'information']]);
   });
 }
 
@@ -211,36 +281,55 @@ test('unavailable Trash leaves the folder and reports once', async () => {
   fs.trash = async () => { throw new Error('unavailable'); };
   await trashDeckFolders([{ file: original, text }, { file: original, text }], [original, original], fs);
   assert.ok(folders.has(assets));
-  assert.deepEqual(notices, ["“Kickoff.rtms.files” stayed where it was, because it couldn't be moved to the Trash."]);
+  assert.deepEqual(notices, [["“Kickoff.rtms.files” stayed where it was, because it couldn't be moved to the Trash.", 'warning']]);
 });
 
 test('Copy/Paste copies pictures and rewrites only the new deck, unless its folder is taken', async () => {
   const { fs, content } = fixture();
   const copy = 'work/Kickoff copy 2.deck.md';
-  content.set(copy, text);
+  const written = text + handout;
+  content.set(original, written);
+  content.set(copy, written);
+  content.set(assets + '/a b.docx', 'brief');
+  content.set('a.md', 'notes');
   content.set('work/other.png', 'other');
-  const copied = await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy));
-  assert.equal(copied, text.replaceAll('Kickoff.rtms.files/', 'Kickoff copy 2.deck.md.files/'));
+  const copied = await copyCreatedDeckPictures(copy, written, fs, await fs.readBytes(copy));
+  assert.equal(copied, written.replaceAll('Kickoff.rtms.files/', 'Kickoff copy 2.deck.md.files/'));
   assert.equal(content.get('work/Kickoff copy 2.deck.md.files/x.png'), 'x');
   assert.equal(content.get('work/Kickoff copy 2.deck.md.files/y.png'), 'y');
-  assert.equal(content.get(original), text);
-  assert.equal(await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy)), text);
+  assert.equal(content.get(original), written);
+  assert.equal(await copyCreatedDeckPictures(copy, written, fs, await fs.readBytes(copy)), written);
 });
 
 test('Copy/Paste into another folder copies pictures and rebases other relative links', async () => {
   const { fs, content, searches } = fixture();
   const copy = 'work/Archive/Kickoff.rtms';
-  const written = text.replace('other.png', 'images/other.png') + '[![Photo](<Kickoff.rtms.files/y.png>)](../notes.md#next)\n';
+  const written = text.replace('other.png', 'images/other.png') + '[![Photo](<Kickoff.rtms.files/y.png>)](../notes.md#next)\n' + handout;
   content.set(original, written);
   content.set(copy, written);
   content.set('work/images/other.png', 'other');
   content.set('notes.md', 'notes');
   assert.equal(await copyCreatedDeckPictures(copy, written, fs, await fs.readBytes(copy)),
-    written.replace('images/other.png', '../images/other.png').replace('../notes.md', '../../notes.md'));
+    written.replace('images/other.png', '../images/other.png').replace('../notes.md', '../../notes.md').replaceAll('../a.md', '../../a.md'));
   assert.equal(content.get('work/Archive/Kickoff.rtms.files/x.png'), 'x');
   assert.equal(content.get('work/Archive/Kickoff.rtms.files/y.png'), 'y');
   assert.equal(content.get(original), written);
   assert.deepEqual(searches, [{ glob: '**/{Kickoff.rtms,Kickoff.deck.md}', limit: 32 }]);
+});
+
+test('a copy owns its marked page under the original filename', async () => {
+  const { fs, content, changes, notices } = fixture();
+  const copy = 'work/Kickoff copy.rtms';
+  const copyFolder = copy + '.files';
+  content.set(assets + '/Kickoff.html', pageMark);
+  content.set('work/other.png', 'other');
+  content.set(copy, text);
+  const copied = await copyCreatedDeckPictures(copy, text, fs, await fs.readBytes(copy));
+  assert.equal(content.has(copyFolder + '/Kickoff.html'), true);
+  content.delete(copy);
+  await trashDeckFolders([{ file: copy, text: copied }], [copy], fs);
+  assert.deepEqual(changes, [`trash ${copyFolder}`]);
+  assert.deepEqual(notices, [['“Kickoff copy.rtms.files” went to the Trash with the deck.', 'information']]);
 });
 
 for (const matches of [0, 2]) {
