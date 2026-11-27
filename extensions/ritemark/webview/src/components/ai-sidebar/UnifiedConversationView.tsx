@@ -7,11 +7,14 @@
  * either conversation array has turns.
  */
 
-import { Fragment, useRef, useEffect, useCallback } from 'react';
+import { Fragment, useRef, useEffect, useCallback, useLayoutEffect, useState } from 'react';
 import { useAISidebarStore, useActiveConversation } from './store';
 import { AgentTurnBlock } from './AgentView';
 import { CodexTurn, CompatibilityNotice, getCompatibilityNotice } from './CodexView';
 import { ActivityStatusLine } from './ActivityStatusLine';
+import { AnswerFeedbackControls, AnswerFeedbackForm } from './AnswerFeedback';
+import { answerFeedbackStore, feedbackDraftIsOpen, isCompletedAnswer, type OpenFeedbackDraft } from './answerFeedbackState';
+import { deriveActivityState } from './activityState';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 import type {
   ConversationContinuationNotice,
@@ -112,6 +115,37 @@ export function UnifiedConversationView() {
   }, []);
 
   const lastMerged = merged[merged.length - 1];
+  const latestQueuedId = useAISidebarStore((s) => {
+    const queue = s.promptQueues[activeConversation.id];
+    return queue?.[queue.length - 1]?.id;
+  });
+  const feedbackScope = { conversationId: activeConversation.id, latestTurnId: lastMerged?.turn.id, latestQueuedId };
+  const [openFeedbackDraft, setOpenFeedbackDraft] = useState<OpenFeedbackDraft | null>(null);
+  const closeFeedbackDraft = useCallback(() => setOpenFeedbackDraft(null), []);
+  useLayoutEffect(closeFeedbackDraft, [closeFeedbackDraft, feedbackScope.conversationId, feedbackScope.latestTurnId, latestQueuedId]);
+
+  const eligibleTurns = answerFeedbackStore((state) => state.eligibleTurns[activeConversation.id]);
+  const hasFeedback = (turn: AgentConversationTurn | CodexConversationTurn) =>
+    eligibleTurns?.has(turn.id) && isCompletedAnswer(turn);
+  const latestWithFeedback = lastMerged && hasFeedback(lastMerged.turn)
+    && deriveActivityState(activeConversation) === 'done'
+    ? lastMerged.turn.id : undefined;
+  const feedbackControls = (turnId: string) => (
+    <AnswerFeedbackControls
+      draftOpen={feedbackDraftIsOpen(openFeedbackDraft, feedbackScope, turnId)}
+      target={{ conversationId: activeConversation.id, turnId }}
+      openForm={(trigger) => setOpenFeedbackDraft({ ...feedbackScope, turnId, trigger })}
+      closeForm={closeFeedbackDraft}
+    />
+  );
+  const feedbackForm = (turnId: string) => (
+    <AnswerFeedbackForm
+      key={`${activeConversation.id}:${turnId}`}
+      target={{ conversationId: activeConversation.id, turnId }}
+      close={closeFeedbackDraft}
+      trigger={openFeedbackDraft?.trigger}
+    />
+  );
   const lastAgentTurn = lastMerged?.runtime === 'claude' ? lastMerged.turn : undefined;
   const questionContext = lastAgentTurn?.pendingQuestion ? lastAgentTurn.assistantText : undefined;
   const lastCodexTurn = lastMerged?.runtime === 'codex' ? lastMerged.turn : undefined;
@@ -196,6 +230,8 @@ export function UnifiedConversationView() {
 
         {merged.map((item, index) => {
           const boundaries = transcriptBoundaries.filter((boundary) => boundary.turnId === item.turn.id);
+          const olderAnswer = index !== merged.length - 1 && hasFeedback(item.turn);
+          const draftOpen = feedbackDraftIsOpen(openFeedbackDraft, feedbackScope, item.turn.id);
           const showLiveNotice = continuationNotice
             && (continuationNotice.turnId === item.turn.id
               || (!continuationNotice.turnId && index === merged.length - 1));
@@ -212,27 +248,35 @@ export function UnifiedConversationView() {
                   onDismiss={() => dismissContinuationNotice(activeConversation.id)}
                 />
               )}
-              {item.runtime === 'claude' ? (
-                <AgentTurnBlock
-                  turn={item.turn}
-                  isMixedRuntime={isMixedRuntime}
-                  answerAgentQuestion={answerAgentQuestion}
-                  approvePlan={approvePlan}
-                  rejectPlan={rejectPlan}
-                  handleToolApproval={handleToolApproval}
-                />
-              ) : (
-                <CodexTurn
-                  turn={item.turn}
-                  isMixedRuntime={isMixedRuntime}
-                  isLatest={index === merged.length - 1}
-                  onApprove={(requestId) => handleCodexApproval(requestId, true)}
-                  onReject={(requestId) => handleCodexApproval(requestId, false)}
-                  onAnswerQuestion={answerCodexQuestion}
-                  onApprovePlan={approveCodexPlan}
-                  onDiscardPlan={discardCodexPlan}
-                />
-              )}
+              <div data-older-answer={olderAnswer || undefined}>
+                {item.runtime === 'claude' ? (
+                  <AgentTurnBlock
+                    turn={item.turn}
+                    isMixedRuntime={isMixedRuntime}
+                    answerAgentQuestion={answerAgentQuestion}
+                    approvePlan={approvePlan}
+                    rejectPlan={rejectPlan}
+                    handleToolApproval={handleToolApproval}
+                  />
+                ) : (
+                  <CodexTurn
+                    turn={item.turn}
+                    isMixedRuntime={isMixedRuntime}
+                    isLatest={index === merged.length - 1}
+                    onApprove={(requestId) => handleCodexApproval(requestId, true)}
+                    onReject={(requestId) => handleCodexApproval(requestId, false)}
+                    onAnswerQuestion={answerCodexQuestion}
+                    onApprovePlan={approveCodexPlan}
+                    onDiscardPlan={discardCodexPlan}
+                  />
+                )}
+                {olderAnswer && (
+                  <div className="flex px-1 pt-1" data-answer-actions data-draft-open={draftOpen || undefined}>
+                    {feedbackControls(item.turn.id)}
+                  </div>
+                )}
+                {olderAnswer && draftOpen && <div className="mt-1">{feedbackForm(item.turn.id)}</div>}
+              </div>
             </Fragment>
           );
         })}
@@ -244,10 +288,15 @@ export function UnifiedConversationView() {
         {/* Sprint 103 R7: single truthful status line under the transcript. */}
         {merged.length > 0 && (
           <ActivityStatusLine
+            doneActions={latestWithFeedback && feedbackControls(latestWithFeedback)}
             // Sprint 175 PR 8 (the Experience lead): a last turn ending in Ritemark's live-page step and Done read as the
             // turn's closing pair, with the gap between the AI's own meta lines rather than the gap between turns.
             closesLiveStep={unmergedBoundaries === 0 && Boolean(merged[merged.length - 1]?.turn.result?.liveDeckSteps?.length)}
           />
+        )}
+
+        {latestWithFeedback && feedbackDraftIsOpen(openFeedbackDraft, feedbackScope, latestWithFeedback) && (
+          <div style={{ marginTop: 4 }}>{feedbackForm(latestWithFeedback)}</div>
         )}
 
         <div ref={endRef} />

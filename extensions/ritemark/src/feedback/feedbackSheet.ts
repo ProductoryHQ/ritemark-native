@@ -22,7 +22,9 @@ import * as vscode from 'vscode';
 import { sendFeedback, trackEvent } from '../analytics/posthog';
 import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { openReportMail, type ReportTransportOutcome } from '../reporting/reportTransport';
+import type { FeedbackSheetOutcome, OpenAnswerFeedbackResult } from './answerFeedbackProtocol';
 import { FEEDBACK_COPY } from './feedbackCopy';
+import { isSafeFeedbackQuotePart } from './feedbackQuoteSafety';
 import { answerForSheet, mailKindOf, routeOf } from './feedbackRoute';
 
 export const FEEDBACK_OPEN_COMMAND = 'ritemark.feedback.open';
@@ -84,9 +86,6 @@ export type FeedbackSubmitResult =
   | { route: 'straight'; outcome: 'accepted' | 'failed' }
   | { route: 'email'; outcome: ReportTransportOutcome | 'invalid'; kindLabel: string; shown: string; copyText: string };
 
-/** What the workbench's sheet resolves with once it closes (patch 018's `RitemarkFeedbackSheetOutcome`). */
-export type FeedbackSheetOutcome = 'sent' | 'mailed' | 'cancelled';
-
 export interface FeedbackDependencies {
   appVersion: string;
   /** The open chat's last answer on the AI's sheet, from its record; null without one. */
@@ -113,13 +112,7 @@ function decodeQuote(raw: unknown): { quote: FeedbackCardQuote; key: string } | 
   const { title, line } = recordOf(raw);
   if (typeof title !== 'string' || typeof line !== 'string') return;
   const parts = [title, line].map(part => part.trim());
-  // Scan the original words, including URL paths and query strings, before truncation.
-  const localPath = /\/(?:users|home|volumes|private|tmp|var|mnt|media|root|etc|opt|srv|usr|workspaces?)\/|…\/documents\/|~\/|\b[a-z]:[\\/]|\\\\[^\s\\/]+\\|\b(?:file|smb):/i;
-  const credentials = /\/\/[^/\s?#@]+@|[?&](?:key|api_key|apikey|token|access_token|sig|signature|password|secret)=/i;
-  // Any other absolute path that names a file (`/a/b/c.docx`), outside web addresses (Codex's review of #1135).
-  const webAddress = /\b[a-z][a-z\d+.-]*:\/\/[^\s"'“”‘’«»<>()[\]{},;]+/giu;
-  const filePath = /(?:^|[^\p{L}\p{N}_.-])\/(?:[^\s/\\"'“”‘’«»<>()[\]{},;]+\/)+[^\s/\\"'“”‘’«»<>()[\]{},;]*[^\s/\\"'“”‘’«»<>()[\]{},;.]\.[a-z][a-z\d]{0,7}(?![\p{L}\p{N}])/iu;
-  if (parts.some(part => !part || localPath.test(part) || credentials.test(part) || filePath.test(part.replace(webAddress, ' ')))) return;
+  if (!parts.every(isSafeFeedbackQuotePart)) return;
   return {
     quote: {
       title: boundQuotePart(parts[0].replace(/[\r\n\u2028\u2029]+/g, ' '), 120),
@@ -180,8 +173,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
   let open: OpenSheet | null = null;
 
   let opening = false;
-  const openSheet = async (raw?: unknown): Promise<void> => {
-    if (opening) return;
+  const openSheet = async (raw?: unknown): Promise<OpenAnswerFeedbackResult['outcome']> => {
+    if (opening) return 'failed';
     opening = true;
     try {
       const options = decodeOpen(raw);
@@ -191,6 +184,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       const last = await (options.turn ? deps.answerOfTurn(options.turn)
         : contextual ? Promise.resolve(null) : deps.lastAnswer()).catch(() => null);
       const answer = last ? answerForSheet(reportContext, last.text) : null;
+      const addAnswer = options.from === 'thumb' && options.withAnswer;
+      if (addAnswer && !answer) return 'failed';
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
       const includeAnswer = Boolean(options.withAnswer && options.turn && answer);
@@ -212,19 +207,22 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       try {
         result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
       } catch {
+        if (addAnswer) return 'failed'; // The fallback input box cannot take the answer.
         // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
         if (spec.aiIssue && !contextual) {
           await deps.openReportWindow();
-          return;
+          return 'failed';
         }
         const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, value: options.text, ignoreFocusOut: true });
-        if (!text?.trim()) return;
+        if (!text?.trim()) return 'cancelled';
         const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), from: sentFrom(options.from) } }]);
         if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
         else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
-        return;
+        return sent ? 'sent' : 'failed';
       }
       if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
+      // The existing workbench command reports the outcome when the sheet closes.
+      return result === 'sent' || result === 'mailed' || result === 'cancelled' ? result : 'failed';
     } finally {
       open = null;
       opening = false;

@@ -42,6 +42,7 @@ interface AgentResponseProps {
 interface RecoveryNoticeProps {
   title: string;
   message: string;
+  detail?: string;
   tone?: 'warning' | 'progress' | 'success' | 'error';
   actionLabel?: string;
   actionIcon?: 'key' | 'sign-in' | 'arrow-counter-clockwise' | 'check';
@@ -55,6 +56,7 @@ interface RecoveryNoticeProps {
 function RecoveryNotice({
   title,
   message,
+  detail,
   tone = 'warning',
   actionLabel,
   actionIcon,
@@ -67,7 +69,9 @@ function RecoveryNotice({
     <RuntimeNotice
       title={title}
       message={message}
+      detail={detail}
       tone={tone}
+      feedback={tone === 'warning' || tone === 'error'}
       statusLabel={statusLabel}
       primaryAction={actionLabel && actionIcon && onAction ? {
         label: actionLabel,
@@ -146,7 +150,8 @@ export function AgentResponse({ turn }: AgentResponseProps) {
           <RecoveryNotice
             tone="error"
             title="Claude sign-in didn’t finish"
-            message={setupError || 'Ritemark could not confirm the sign-in. Please try again.'}
+            message="Ritemark could not confirm the sign-in. Please try again."
+            detail={setupError ?? undefined}
             actionLabel="Try again"
             actionIcon="arrow-counter-clockwise"
             actionTooltip="Opens Claude's sign-in page in your browser again."
@@ -159,6 +164,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
     return (
       <div style={chatFontStyle}>
         <RuntimeNotice
+          feedback
           title={usesApiKey ? 'Claude API key needs attention' : 'Claude needs you to sign in again'}
           message={usesApiKey
             ? 'Claude did not accept the saved key. Update it in AI Settings, then resend your message.'
@@ -240,7 +246,7 @@ export function AgentResponse({ turn }: AgentResponseProps) {
 
   // Success result
   return (
-    <div style={chatFontStyle}>
+    <div style={chatFontStyle} data-ai-answer>
       {result.text && (
         <RenderedMarkdown content={result.text} />
       )}

@@ -17,6 +17,16 @@
    file's rules, can't hide it (the Select's trigger did). */
 :where(:root:not([data-input-mode="pointer"])) .rm-focus-ring.rm-focus-ring:focus-visible { outline: 2px solid var(--r-focus-ring); outline-offset: 2px; }
 
+/* Leave older answer actions in the tab order. Reveal them for the answer itself,
+   its controls, or a draft that still has the person's attention. */
+[data-older-answer] > [data-answer-actions] { opacity: 0; }
+[data-older-answer]:has([data-ai-answer]:hover) > [data-answer-actions],
+[data-older-answer] > [data-answer-actions]:is(:hover, [data-draft-open]),
+:where(:root:not([data-input-mode="pointer"])) [data-older-answer]:has([data-ai-answer]:focus-within) > [data-answer-actions],
+:where(:root:not([data-input-mode="pointer"])) [data-older-answer] > [data-answer-actions]:focus-within {
+  opacity: 1;
+}
+
 /* Everything clickable shows the pointing hand — Tailwind's preflight leaves
    buttons at `cursor: default`. `:where()` keeps this at zero specificity, so
    any class (`cursor-not-allowed` on a refused action, `cursor-text`, …) and

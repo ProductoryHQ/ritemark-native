@@ -19,7 +19,7 @@ import { AgentQuestion } from './AgentQuestion';
 import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { StartingPoints } from './StartingPoints';
-import { extractPlanDisplayText } from './planText';
+import { codexPlanReplacesStreamingAnswer, extractPlanDisplayText } from './planText';
 import { ThemeChangeActions } from './ThemeChangeActions';
 import { TurnFailureCard } from './TurnFailureCard';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
@@ -164,9 +164,7 @@ export function CodexTurn({
     && ((turn.planSteps && turn.planSteps.length > 0) || displayPlanText)
   );
   const needsPlanReview = Boolean(showPlanCard && turn.result && !turn.result.error && turn.requiresPlanReview && !turn.planHandled);
-  const shouldHideStreamingBubble = Boolean(showPlanCard && displayPlanText)
-    && turn.streamingText.trim().length > 0
-    && rawPlanText.trim() === turn.streamingText.trim();
+  const shouldHideStreamingBubble = codexPlanReplacesStreamingAnswer(turn);
 
   // OpenCode reuses this Codex turn shape/rendering — label by provenance.
   const runtimeLabel = turn.runtime === 'opencode' ? 'OpenCode' : 'ChatGPT';
@@ -298,7 +296,7 @@ function PlanCard({
   planText?: string;
 }) {
   return (
-    <div className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
+    <div data-ai-answer className="mx-1 rounded-lg border border-[var(--r-hairline)] bg-[color:color-mix(in_srgb,var(--vscode-input-background)_80%,transparent)] p-3 shadow-[0_1px_2px_rgba(30,27,75,0.04)]">
       <div className="mb-2 text-[11px] font-medium text-[var(--r-ink-muted)]">ChatGPT's plan</div>
       {explanation && (
         <p className="text-[12px] opacity-85 mb-2 whitespace-pre-wrap">{explanation}</p>

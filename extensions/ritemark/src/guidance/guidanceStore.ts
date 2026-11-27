@@ -16,6 +16,8 @@ import { dirname, join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { AgentId } from '../agent/types';
 import { testChannelRequested } from '../analytics/consent';
+import { isConversationId } from '../conversations/types';
+import type { AnswerFeedbackTarget, AnswerReaction, StoredAnswerReaction } from '../feedback/answerFeedbackProtocol';
 import { localDay, releaseOf, withSavedDay, SAVED_DAYS_FOR_FEEDBACK } from './guidanceState';
 import type { ReadyGone, ReadyRecord } from './readyRequest';
 
@@ -32,6 +34,7 @@ export interface GuidanceStateV1 {
   readyShownOn?: string;
   savedDays: string[];
   positiveReaction?: true;
+  answerReactions?: SavedAnswerReaction[];
   /** null means an earlier build already ran on this profile. */
   firstAppRun?: string | null;
   release?: { id: string; savedDays: string[]; feedback?: 'sent' | 'not-now' };
@@ -49,6 +52,28 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isDay = (value: unknown): value is string => typeof value === 'string' && DAY.test(value);
 const daysOf = (value: unknown): string[] => Array.isArray(value) ? value.filter(isDay) : [];
+
+const MAX_ANSWER_REACTIONS = 500;
+type SavedAnswerReaction = AnswerFeedbackTarget & Omit<StoredAnswerReaction, 'turnId'>;
+
+function decodeAnswerReactions(raw: unknown): SavedAnswerReaction[] {
+  if (!raw || typeof raw !== 'object') return [];
+  // The first version grouped marks by chat, so its order is known within each
+  // chat. New marks are stored in creation order across chats.
+  const entries = Array.isArray(raw) ? raw : Object.entries(raw).flatMap(([conversationId, marks]) =>
+    Array.isArray(marks) ? marks.map(mark => ({ ...mark, conversationId })) : []);
+  const unique = new Map<string, SavedAnswerReaction>();
+  for (const entry of entries) {
+    if (!entry || typeof entry.conversationId !== 'string' || !isConversationId(entry.conversationId)) continue;
+    if (typeof entry.turnId !== 'string' || !entry.turnId.trim()) continue;
+    if (entry.reaction !== 'up' && entry.reaction !== 'down') continue;
+    const { conversationId, turnId, reaction } = entry;
+    const key = JSON.stringify([conversationId, turnId]);
+    unique.delete(key);
+    unique.set(key, { conversationId, turnId, reaction, sent: entry.sent === true });
+  }
+  return [...unique.values()].slice(-MAX_ANSWER_REACTIONS);
+}
 
 /** A stored value read defensively: anything malformed is dropped, never trusted. */
 export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
@@ -68,11 +93,13 @@ export function decodeGuidanceState(raw: unknown): GuidanceStateV1 {
     }
   }
   const release = value.release as Record<string, unknown> | undefined;
+  const answerReactions = decodeAnswerReactions(value.answerReactions);
   return {
     v: 1,
     projects,
     savedDays: [...new Set(daysOf(value.savedDays ?? release?.savedDays))].sort().slice(-SAVED_DAYS_FOR_FEEDBACK),
     ...(value.positiveReaction === true ? { positiveReaction: true } : {}),
+    ...(answerReactions.length ? { answerReactions } : {}),
     ...(typeof value.firstAppRun === 'string' || value.firstAppRun === null ? { firstAppRun: value.firstAppRun } : {}),
     ...(typeof value.readyShownOn === 'string' && DAY.test(value.readyShownOn) ? { readyShownOn: value.readyShownOn } : {}),
     ...(release && typeof release.id === 'string'
@@ -243,6 +270,40 @@ export class GuidanceStore {
         return { ...state, savedDays, release: { ...release, savedDays: withSavedDay(release.savedDays, day) } };
       }
       return savedDays === state.savedDays ? state : { ...state, savedDays };
+    });
+  }
+
+  notePositiveReaction(): Promise<void> {
+    return this.change((state) => state.positiveReaction ? state : { ...state, positiveReaction: true });
+  }
+
+  answerReactionsOf(conversationId: string): StoredAnswerReaction[] {
+    return (this.read().answerReactions ?? [])
+      .filter(mark => mark.conversationId === conversationId)
+      .map(({ turnId, reaction, sent }) => ({ turnId, reaction, sent }));
+  }
+
+  changeAnswerReaction({ conversationId, turnId }: AnswerFeedbackTarget, reaction: AnswerReaction): Promise<boolean> {
+    return this.serialize(async (state) => {
+      const marks = state.answerReactions ?? [];
+      const matches = (mark: SavedAnswerReaction) => mark.conversationId === conversationId && mark.turnId === turnId;
+      // A second mark requires Take back first, and an unmarked turn has nothing to take back.
+      if (marks.some(matches) !== (reaction === 'none')) return false;
+      const answerReactions = reaction === 'none'
+        ? marks.filter(mark => !matches(mark))
+        : [...marks, { conversationId, turnId, reaction, sent: false }].slice(-MAX_ANSWER_REACTIONS);
+      await this.memento.update(GUIDANCE_KEY, { ...state, answerReactions });
+      return true;
+    });
+  }
+
+  noteAnswerReactionSent({ conversationId, turnId }: AnswerFeedbackTarget, reaction: StoredAnswerReaction['reaction']): Promise<void> {
+    return this.change((state) => {
+      const marks = state.answerReactions;
+      const matches = (mark: SavedAnswerReaction) =>
+        mark.conversationId === conversationId && mark.turnId === turnId && mark.reaction === reaction && !mark.sent;
+      if (!marks?.some(matches)) return state;
+      return { ...state, answerReactions: marks.map(mark => matches(mark) ? { ...mark, sent: true } : mark) };
     });
   }
 
