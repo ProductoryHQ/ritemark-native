@@ -8,18 +8,17 @@ import { UserExtensionInstaller } from './userExtensionInstaller';
 
 export type UpdateNotificationChoice = 'install' | 'later' | 'skip' | 'pause';
 
+// #1120: two buttons, in sentence case (settings spec, experience 7). Four
+// buttons squeezed VS Code's "Source: Ritemark" label to a stray "S". Skip
+// and pause stay in Settings → Updates ("Skip this version", "Remind me in 7 days").
 const FULL_UPDATE_ACTIONS = {
-  INSTALL: 'Download Installer',
-  LATER: 'Later',
-  SKIP: 'Skip This Version',
-  PAUSE: 'Pause 7 Days'
+  INSTALL: 'Download the installer',
+  LATER: 'Later'
 } as const;
 
 const EXTENSION_UPDATE_ACTIONS = {
-  INSTALL: 'Install Update',
-  LATER: 'Later',
-  SKIP: 'Skip This Version',
-  PAUSE: 'Pause 7 Days'
+  INSTALL: 'Install update',
+  LATER: 'Later'
 } as const;
 
 export async function showFullUpdateNotification(
@@ -35,22 +34,10 @@ export async function showFullUpdateNotification(
     message,
     { detail: manifest.releaseNotes || `A full app update is ready for version ${versionLabel}.` },
     FULL_UPDATE_ACTIONS.INSTALL,
-    FULL_UPDATE_ACTIONS.LATER,
-    FULL_UPDATE_ACTIONS.SKIP,
-    FULL_UPDATE_ACTIONS.PAUSE
+    FULL_UPDATE_ACTIONS.LATER
   );
 
-  switch (selection) {
-    case FULL_UPDATE_ACTIONS.INSTALL:
-      return 'install';
-    case FULL_UPDATE_ACTIONS.SKIP:
-      return 'skip';
-    case FULL_UPDATE_ACTIONS.PAUSE:
-      return 'pause';
-    case FULL_UPDATE_ACTIONS.LATER:
-    default:
-      return 'later';
-  }
+  return selection === FULL_UPDATE_ACTIONS.INSTALL ? 'install' : 'later';
 }
 
 export async function showExtensionUpdateNotification(
@@ -65,22 +52,10 @@ export async function showExtensionUpdateNotification(
     `Extension update ${manifest.version} is available (${downloadSize})`,
     { detail },
     EXTENSION_UPDATE_ACTIONS.INSTALL,
-    EXTENSION_UPDATE_ACTIONS.LATER,
-    EXTENSION_UPDATE_ACTIONS.SKIP,
-    EXTENSION_UPDATE_ACTIONS.PAUSE
+    EXTENSION_UPDATE_ACTIONS.LATER
   );
 
-  switch (selection) {
-    case EXTENSION_UPDATE_ACTIONS.INSTALL:
-      return 'install';
-    case EXTENSION_UPDATE_ACTIONS.SKIP:
-      return 'skip';
-    case EXTENSION_UPDATE_ACTIONS.PAUSE:
-      return 'pause';
-    case EXTENSION_UPDATE_ACTIONS.LATER:
-    default:
-      return 'later';
-  }
+  return selection === EXTENSION_UPDATE_ACTIONS.INSTALL ? 'install' : 'later';
 }
 
 export async function installExtensionUpdateWithProgress(
