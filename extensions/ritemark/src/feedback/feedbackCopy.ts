@@ -72,6 +72,19 @@ export const FEEDBACK_COPY = {
     kindReport: 'Report an AI issue',
     kindMessage: 'Send feedback',
   },
+  picture: {
+    box: 'Add a picture of this window',
+    preview: "It shows what's on your screen, your document too.",
+    note: 'The picture goes on your clipboard, to paste into the e-mail ({key}).',
+    paste: 'Paste the picture into the e-mail ({key}).',
+    failed: "The picture couldn't be copied, so the e-mail has your words only.",
+    copyHandoff: {
+      wordsButton: 'Copy words',
+      pictureButton: 'Copy picture',
+      pictureHint: 'Puts the picture back on your clipboard',
+      wordsCopied: 'Your words are on the clipboard now, in place of the picture. Paste them, then press Copy picture.',
+    },
+  },
   /** Each sheet button's hover hint, and why Send waits (QA, 26 October). */
   hints: {
     leaveThisOut: 'Leave this out',
@@ -100,8 +113,12 @@ export const FEEDBACK_COPY = {
 
 /** The e-mail route's words: none may claim a delivery Ritemark cannot see. */
 export function emailRouteStrings(): string[] {
-  const { sheet, handoff } = FEEDBACK_COPY;
+  const { sheet, handoff, picture } = FEEDBACK_COPY;
   return [
+    picture.note,
+    picture.paste,
+    picture.failed,
+    ...Object.values(picture.copyHandoff),
     sheet.email.button,
     sheet.email.foot,
     sheet.email.via,

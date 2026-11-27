@@ -18,7 +18,7 @@ Given a supported failure card, when I open Tell us about this, then its display
 
 ### S5 · Feedback when the network is down (R1, R2, R4)
 
-Given the straight route cannot reach the service, when I Send, then the words stay available and I can retry or open e-mail. An accepted e-mail handoff never says Sent. With no mail handler or an oversized body I can use Copy. Copy makes clear whether it replaces the picture clipboard.
+Given the straight route cannot reach the service, when I Send, then the words stay available and I can retry or open e-mail. An accepted e-mail handoff never says Sent. With no mail handler or an oversized body, I can use Copy for text-only feedback. With the picture ticked, Copy words puts the text on the clipboard and explains how to restore the image with Copy picture. If copying the image fails, the handoff says the e-mail has words only.
 
 ### S6 · Home earns its moment (R3, R6)
 
@@ -30,7 +30,7 @@ Given the card has shown, when I revisit Home or switch projects in the same ses
 
 ### S8 · Picture stays local until I choose what to do (R4)
 
-Given two Ritemark windows and another app, when I tick the picture box, then the preview shows only the window that opened the sheet and no picture is written to clipboard, disk or network. Uncheck or dismiss and verify the same. On Open in e-mail only the reviewed picture reaches the clipboard. The mail draft contains text, and the picture leaves the machine only if I paste it and send the e-mail.
+Given two Ritemark windows and another app, when I tick the picture box, then the preview shows only the window that opened the sheet and no picture is written to clipboard, disk or network. Uncheck or dismiss and verify the same. On Open in e-mail only the reviewed picture reaches the clipboard. The mail draft contains text, and the picture leaves the machine only if I paste it and send the e-mail. Open feedback from a detached editor or presentation and check that the picture box is absent. If capture takes longer than 1.5 seconds, the main-window sheet opens without a picture box.
 
 ### S9 · Capture and mail on Windows (R4)
 
@@ -46,4 +46,4 @@ Given a previous build has two saved days, when I update and save twice on a thi
 
 ### S12 · Controls and dismissal (R1–R5)
 
-Given keyboard navigation, a narrow sidebar and light and dark themes, when I visit every added button, then its tooltip and accessible name describe its action and its label stays on one line. Outside click and Esc close popups and restore focus. Existing retry and recovery actions still work. Check the native menu and the shell sheet with their respective controls.
+Given keyboard navigation, a narrow sidebar and light and dark themes, when I visit every added button, then its tooltip and accessible name describe its action and its label stays on one line. Outside click and Esc close popups and restore focus. Existing retry and recovery actions still work. Check the native menu and the shell sheet with their respective controls. In a short window with the picture ticked, the body scrolls and the footer buttons stay visible. The hairline marks content below the visible body and clears at the end. Enlarging the window centres the sheet again.

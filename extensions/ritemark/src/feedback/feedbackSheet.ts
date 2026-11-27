@@ -78,6 +78,7 @@ export interface FeedbackSubmitRequest {
   aiIssue: boolean;
   wantAnswer: boolean;
   withAnswer: boolean;
+  withPicture: boolean;
   includeQuote?: boolean;
 }
 
@@ -155,7 +156,8 @@ function decodeSubmit(raw: unknown): FeedbackSubmitRequest | null {
   if (value.route !== 'straight' && value.route !== 'email') return null;
   const flags = ['aiIssue', 'wantAnswer', 'withAnswer'] as const;
   if (!flags.every((flag) => typeof value[flag] === 'boolean')) return null;
-  return { token: value.token, route: value.route, text: value.text, aiIssue: value.aiIssue as boolean, wantAnswer: value.wantAnswer as boolean, withAnswer: value.withAnswer as boolean, includeQuote: value.includeQuote === true };
+  if (value.withPicture !== undefined && typeof value.withPicture !== 'boolean') return null;
+  return { token: value.token, route: value.route, text: value.text, aiIssue: value.aiIssue as boolean, wantAnswer: value.wantAnswer as boolean, withAnswer: value.withAnswer as boolean, includeQuote: value.includeQuote === true, withPicture: value.withPicture === true };
 }
 
 /** One open sheet's context: the answer it showed and the time the report carries. */
