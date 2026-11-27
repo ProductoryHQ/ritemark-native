@@ -3555,10 +3555,10 @@ index afa6942390e..a41b0cfe9a9 100644
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
 new file mode 100644
-index 00000000000..eee0b19eced
+index 00000000000..0dbebe5a47a
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
-@@ -0,0 +1,336 @@
+@@ -0,0 +1,351 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3583,15 +3583,22 @@ index 00000000000..eee0b19eced
 +	box-sizing: border-box;
 +	width: 440px;
 +	max-width: calc(100vw - 32px);
-+	max-height: calc(100vh - 64px);
-+	overflow-y: auto;
-+	padding: 20px;
++	max-height: calc(100% - 64px);
++	display: flex;
++	flex-direction: column;
++	overflow: hidden;
 +	border-radius: 12px;
 +	background: var(--rm-desk);
 +	color: var(--vscode-foreground);
 +	box-shadow: 0 0 0 1px var(--rm-hairline), 0 24px 48px -12px color-mix(in srgb, var(--vscode-foreground) 28%, transparent), 0 8px 16px -8px color-mix(in srgb, var(--vscode-foreground) 12%, transparent);
 +	font-size: 13px;
 +	line-height: 20px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-body {
++	min-height: 0;
++	overflow-y: auto;
++	padding: 20px 20px 4px;
 +}
 +
 +.monaco-workbench .ritemark-feedback-block .ritemark-feedback-sheet:focus {
@@ -3683,8 +3690,10 @@ index 00000000000..eee0b19eced
 +	transform: rotate(-45deg);
 +}
 +
-+/* The workbench supplies a default outline on every focused checkbox. */
-+.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input:focus:not(:focus-visible) {
++/* The workbench supplies a default outline on focused form controls. */
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-check input:focus:not(:focus-visible),
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button:focus:not(:focus-visible),
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove:focus:not(:focus-visible) {
 +	outline: none;
 +}
 +
@@ -3828,7 +3837,13 @@ index 00000000000..eee0b19eced
 +	align-items: center;
 +	justify-content: flex-end;
 +	gap: 8px;
-+	margin-top: 20px;
++	flex: none;
++	padding: 16px 20px 20px;
++	background: var(--rm-desk);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot.body-overflow {
++	box-shadow: inset 0 1px var(--rm-hairline);
 +}
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-foot-note {
@@ -4031,10 +4046,10 @@ index 252bcf8..718e4a1 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..2937246a43d
+index 00000000000..5abbaa6445b
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,666 @@
+@@ -0,0 +1,748 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4064,7 +4079,7 @@ index 00000000000..2937246a43d
 +import { CommandsRegistry, ICommandService } from '../../../platform/commands/common/commands.js';
 +import { IHoverService } from '../../../platform/hover/browser/hover.js';
 +import { ILayoutService } from '../../../platform/layout/browser/layoutService.js';
-+import { INativeHostOptions, INativeHostService } from '../../../platform/native/common/native.js';
++import { INativeHostService } from '../../../platform/native/common/native.js';
 +import { INotificationService } from '../../../platform/notification/common/notification.js';
 +
 +const SHEET_COMMAND = '_ritemark.feedbackSheet';
@@ -4077,6 +4092,7 @@ index 00000000000..2937246a43d
 +const MAX_PICTURE_EDGE = 2560;
 +const MAX_PICTURE_BYTES = 8 * 1024 * 1024;
 +const SHEET_VERTICAL_MARGIN = 32;
++const CAPTURE_TIMEOUT_MS = 1500;
 +
 +/** How long a brief toast stays: the thank-you goes by itself after a few seconds (experience 35, The build checked). */
 +export const RITEMARK_BRIEF_TOAST_MS = 4000;
@@ -4118,6 +4134,12 @@ index 00000000000..2937246a43d
 +		readonly note: string;
 +		readonly paste: string;
 +		readonly failed: string;
++		readonly copyHandoff?: {
++			readonly wordsButton: string;
++			readonly pictureButton: string;
++			readonly pictureHint: string;
++			readonly wordsCopied: string;
++		};
 +	};
 +	/** Each button's hover hint, and why Send waits; absent from an extension older than 2.1's QA, which draws none. */
 +	readonly hints?: {
@@ -4181,6 +4203,7 @@ index 00000000000..2937246a43d
 +interface ISheetDeps {
 +	submit(request: IRitemarkFeedbackSubmit): Promise<RitemarkFeedbackSubmitResult>;
 +	copy(text: string): Promise<void>;
++	isMainWindow(): boolean;
 +	capturePicture?(): Promise<Blob | undefined>;
 +	encodePicture?(jpeg: Blob): Promise<Blob | undefined>;
 +	copyPicture?(png: Blob): Promise<void>;
@@ -4219,18 +4242,24 @@ index 00000000000..2937246a43d
 +	try {
 +		let picture: Blob | undefined;
 +		const capturePicture = deps.capturePicture;
-+		if (spec.words.picture && capturePicture) {
++		if (spec.words.picture && capturePicture && deps.isMainWindow()) {
 +			// Capture before the scrim exists. Page hide can cancel even while the native capture is pending.
 +			let cancelCapture!: (value: null) => void;
 +			const hidden = new Promise<null>(resolve => { cancelCapture = resolve; });
 +			const pageHide = store.add(addDisposableListener(getWindow(container), EventType.PAGE_HIDE, () => cancelCapture(null)));
-+			const captured = await Promise.race([hidden, (async () => {
++			const window = getWindow(container);
++			let timer: number | undefined;
++			const deadline = new Promise<undefined>(resolve => {
++				timer = window.setTimeout(() => resolve(undefined), CAPTURE_TIMEOUT_MS);
++			});
++			const captured = await Promise.race([hidden, deadline, (async () => {
 +				try {
 +					return await capturePicture();
 +				} catch {
 +					return undefined;
 +				}
 +			})()]);
++			window.clearTimeout(timer);
 +			store.delete(pageHide);
 +			if (captured === null || !container.isConnected) {
 +				return 'cancelled';
@@ -4253,6 +4282,7 @@ index 00000000000..2937246a43d
 +	const words = spec.words;
 +	const pictureWords = words.picture;
 +	const pasteKey = deps.mac ? '⌘V' : 'Ctrl+V';
++	const pastePicture = pictureWords?.paste.replace('{key}', pasteKey) ?? '';
 +	const draftKey = spec.draftKey ?? '';
 +	let windowDrafts = drafts.get(container);
 +	if (!windowDrafts) {
@@ -4267,6 +4297,14 @@ index 00000000000..2937246a43d
 +	sheet.setAttribute('aria-modal', 'true');
 +	sheet.setAttribute('aria-labelledby', 'ritemark-feedback-title');
 +	sheet.setAttribute('aria-describedby', 'ritemark-feedback-lede');
++
++	const body = append(sheet, $('.ritemark-feedback-body'));
++	const content = append(body, $('div'));
++	const foot = append(sheet, $('.ritemark-feedback-foot'));
++	const updateFootEdge = () => {
++		foot.classList.toggle('body-overflow', body.scrollHeight - body.clientHeight - body.scrollTop > 1);
++	};
++	store.add(addDisposableListener(body, EventType.SCROLL, updateFootEdge));
 +
 +	return new Promise<RitemarkFeedbackSheetOutcome>(resolve => {
 +		let previewUrl: string | undefined;
@@ -4319,11 +4357,11 @@ index 00000000000..2937246a43d
 +
 +		// ── The message: frames 2 and 3 ──
 +		const kindWords = spec.kind === 'ai-issue' ? words.sheet.aiIssue : words.sheet.feedback;
-+		const title = append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title'));
++		const title = append(content, $('h3#ritemark-feedback-title.ritemark-feedback-title'));
 +		title.textContent = kindWords.title;
-+		const lede = append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede'));
++		const lede = append(content, $('p#ritemark-feedback-lede.ritemark-feedback-lede'));
 +		lede.textContent = kindWords.lede;
-+		const area = append(sheet, $('textarea.ritemark-feedback-area')) as HTMLTextAreaElement;
++		const area = append(content, $('textarea.ritemark-feedback-area')) as HTMLTextAreaElement;
 +		area.placeholder = kindWords.placeholder;
 +		area.setAttribute('aria-label', kindWords.title);
 +		area.maxLength = 8000;
@@ -4334,7 +4372,7 @@ index 00000000000..2937246a43d
 +		const leaveThisOut = words.hints?.leaveThisOut;
 +		if (spec.quote && fromCard && leaveThisOut) {
 +			includeQuote = true;
-+			const card = append(sheet, $('.ritemark-feedback-quote.ritemark-feedback-card'));
++			const card = append(content, $('.ritemark-feedback-quote.ritemark-feedback-card'));
 +			append(card, $('.ritemark-feedback-card-label')).textContent = fromCard;
 +			append(card, $('.ritemark-feedback-card-title')).textContent = spec.quote.title;
 +			append(card, $('div')).textContent = spec.quote.line;
@@ -4355,29 +4393,28 @@ index 00000000000..2937246a43d
 +				area.focus();
 +			}));
 +		}
-+		const ai = box(sheet, words.sheet.aiBox, undefined);
++		const ai = box(content, words.sheet.aiBox, undefined);
 +		ai.input.checked = spec.aiIssue;
 +		const answerLabel = spec.includeAnswer ? words.sheet.selectedAnswerBox ?? words.sheet.lastAnswerBox : words.sheet.lastAnswerBox;
-+		const last = spec.lastAnswer ? box(sheet, answerLabel, `${words.sheet.lastAnswerNoteBefore}${spec.lastAnswer.chatTitle}${words.sheet.lastAnswerNoteAfter}`) : undefined;
++		const last = spec.lastAnswer ? box(content, answerLabel, `${words.sheet.lastAnswerNoteBefore}${spec.lastAnswer.chatTitle}${words.sheet.lastAnswerNoteAfter}`) : undefined;
 +		if (last) {
 +			last.input.checked = spec.includeAnswer === true;
 +		}
-+		const quote = spec.lastAnswer ? append(sheet, $('.ritemark-feedback-quote')) : undefined;
++		const quote = spec.lastAnswer ? append(content, $('.ritemark-feedback-quote')) : undefined;
 +		if (quote && spec.lastAnswer) {
 +			append(quote, $('.ritemark-feedback-quote-text')).textContent = spec.lastAnswer.quote;
 +			if (spec.lastAnswer.shortened) {
 +				append(quote, $('.ritemark-feedback-quote-note')).textContent = words.sheet.shortenedNote;
 +			}
 +		}
-+		const answer = box(sheet, words.sheet.answerBox, words.sheet.answerNote);
-+		const pictureBox = picture && pictureWords ? box(sheet, pictureWords.box, undefined) : undefined;
-+		const preview = pictureBox ? append(sheet, $('.ritemark-feedback-picture')) : undefined;
-+		const via = append(sheet, $('.ritemark-feedback-via'));
++		const answer = box(content, words.sheet.answerBox, words.sheet.answerNote);
++		const pictureBox = picture && pictureWords ? box(content, pictureWords.box, undefined) : undefined;
++		const preview = pictureBox ? append(content, $('.ritemark-feedback-picture')) : undefined;
++		const via = append(content, $('.ritemark-feedback-via'));
 +		append(via, $('span.codicon.codicon-mail'));
 +		const viaText = append(via, $('span'));
-+		const problem = append(sheet, $('p.ritemark-feedback-problem'));
++		const problem = append(content, $('p.ritemark-feedback-problem'));
 +		problem.setAttribute('role', 'alert');
-+		const foot = append(sheet, $('.ritemark-feedback-foot'));
 +		const footNote = append(foot, $('span.ritemark-feedback-foot-note'));
 +		const cancel = button(foot, words.sheet.cancel, 'ghost');
 +		const toEmail = button(foot, words.sheet.openInEmail, 'ghost');
@@ -4435,36 +4472,91 @@ index 00000000000..2937246a43d
 +		};
 +
 +		// ── After pressing: frames 4 and 5 ──
-+		const handOff = (result: Extract<RitemarkFeedbackSubmitResult, { route: 'email' }>, pictureCopied: boolean | undefined) => {
-+			dropPicture();
-+			const outcome = result.outcome === 'opened' ? words.handoff.opened : result.outcome === 'too-long' ? words.handoff.tooLong : words.handoff.noHandler;
-+			sheet.textContent = '';
++		const writePicture = async () => {
++			try {
++				const png = await encodedPicture;
++				if (!closed && png && deps.copyPicture) {
++					await deps.copyPicture(png);
++					return true;
++				}
++			} catch {
++				// The e-mail handoff still works with words only.
++			}
++			return false;
++		};
++
++		const handOff = (result: Extract<RitemarkFeedbackSubmitResult, { route: 'email' }>, pictureCopied: boolean | undefined, pointer: boolean) => {
++			clearPreview();
++			picture = undefined;
++			const opened = result.outcome === 'opened';
++			const copyHandoff = !opened && pictureCopied !== undefined ? pictureWords?.copyHandoff : undefined;
++			const outcome = opened ? words.handoff.opened : result.outcome === 'too-long' ? words.handoff.tooLong : words.handoff.noHandler;
++			content.replaceChildren();
++			foot.replaceChildren();
++			foot.classList.remove('stacked');
 +			sheet.classList.add('handoff');
-+			append(sheet, $('h3#ritemark-feedback-title.ritemark-feedback-title')).textContent = outcome.title;
-+			append(sheet, $('p#ritemark-feedback-lede.ritemark-feedback-lede')).textContent = result.outcome === 'opened'
++			append(content, $('h3#ritemark-feedback-title.ritemark-feedback-title')).textContent = outcome.title;
++			append(content, $('p#ritemark-feedback-lede.ritemark-feedback-lede')).textContent = opened
 +				? (spec.kind === 'ai-issue' || ai.input.checked ? words.handoff.opened.report : words.handoff.opened.message)
 +				: (outcome as { lede: string }).lede;
-+			const pictureNote = pictureWords && (pictureCopied || (pictureCopied === false && result.outcome === 'opened'))
-+				? append(sheet, $('p.ritemark-feedback-picture-note'))
++			const pictureNote = pictureWords && (pictureCopied || (pictureCopied === false && (opened || copyHandoff)))
++				? append(content, $('p.ritemark-feedback-picture-note', { 'aria-live': 'polite' }))
 +				: undefined;
 +			if (pictureNote && pictureWords) {
-+				pictureNote.textContent = pictureCopied ? pictureWords.paste.replace('{key}', pasteKey) : pictureWords.failed;
++				pictureNote.textContent = pictureCopied ? pastePicture : pictureWords.failed;
 +			}
-+			const shown = append(sheet, $('.ritemark-feedback-quote'));
++			const shown = append(content, $('.ritemark-feedback-quote'));
 +			append(shown, $('b')).textContent = result.kindLabel;
 +			append(shown, $('.ritemark-feedback-quote-text')).textContent = result.shown;
-+			const handoffFoot = append(sheet, $('.ritemark-feedback-foot'));
-+			// "Didn't open? …" only after an e-mail app was asked to open; too long or no e-mail app already says so above
-+			append(handoffFoot, $('span.ritemark-feedback-foot-note')).textContent = result.outcome === 'opened' ? words.handoff.foot : '';
-+			const copy = button(handoffFoot, words.handoff.copy, 'ghost');
++			// "Didn't open? …" only after an e-mail app was asked to open; too long or no e-mail app already says so above.
++			const handoffNote = append(foot, $('span.ritemark-feedback-foot-note'));
++			handoffNote.textContent = opened ? words.handoff.foot : '';
++			const copy = button(foot, copyHandoff?.wordsButton ?? words.handoff.copy, 'ghost');
 +			copy.prepend($('span.codicon.codicon-copy'));
-+			const done = button(handoffFoot, words.handoff.done, 'primary');
++			let copying = false;
++			if (copyHandoff && pictureNote && pictureWords) {
++				handoffNote.hidden = true;
++				const copyPicture = button(foot, copyHandoff.pictureButton, 'ghost');
++				if (deps.hint) {
++					store.add(deps.hint(copyPicture, () => copyHandoff.pictureHint));
++				}
++				store.add(addDisposableListener(copyPicture, EventType.CLICK, async () => {
++					if (copying) {
++						return;
++					}
++					copying = true;
++					try {
++						const copied = await writePicture();
++						if (!closed) {
++							pictureNote.textContent = copied ? pastePicture : pictureWords.failed;
++						}
++					} finally {
++						copying = false;
++					}
++				}));
++			}
++			const done = button(foot, words.handoff.done, 'primary');
 +			if (hints && deps.hint) {
 +				store.add(deps.hint(copy, () => hints.copy));
 +				store.add(deps.hint(done, () => hints.done));
 +			}
 +			store.add(addDisposableListener(copy, EventType.CLICK, async () => {
-+				await deps.copy(result.copyText);
++				if (copying) {
++					return;
++				}
++				copying = true;
++				try {
++					await deps.copy(result.copyText);
++				} finally {
++					copying = false;
++				}
++				if (closed) {
++					return;
++				}
++				if (copyHandoff && pictureNote) {
++					pictureNote.textContent = copyHandoff.wordsCopied;
++					return;
++				}
 +				if (pictureCopied) {
 +					pictureNote?.remove();
 +				}
@@ -4476,7 +4568,9 @@ index 00000000000..2937246a43d
 +				}, 2000);
 +			}));
 +			store.add(addDisposableListener(done, EventType.CLICK, (event: MouseEvent) => close('mailed', event.detail > 0)));
-+			done.focus();
++			body.scrollTop = 0;
++			const focusOptions = { focusVisible: !pointer, preventScroll: true };
++			done.focus(focusOptions);
 +		};
 +
 +		const submit = async (forceEmail: boolean, pointer: boolean) => {
@@ -4491,19 +4585,8 @@ index 00000000000..2937246a43d
 +			const request: IRitemarkFeedbackSubmit = { token: spec.token, route: chosen, text, aiIssue: ai.input.checked, wantAnswer: answer.input.checked, withAnswer: Boolean(last?.input.checked && ai.input.checked), includeQuote, withPicture: withPicture() };
 +			let pictureCopied: boolean | undefined;
 +			if (request.withPicture && picture) {
-+				pictureCopied = false;
-+				try {
-+					const png = await (encodedPicture ??= encodePicture(picture));
-+					if (closed) {
-+						return;
-+					}
-+					if (png && deps.copyPicture) {
-+						await deps.copyPicture(png);
-+						pictureCopied = true;
-+					}
-+				} catch {
-+					// The existing text-only mail handoff still works.
-+				}
++				encodedPicture ??= encodePicture(picture);
++				pictureCopied = await writePicture();
 +				if (closed) {
 +					return;
 +				}
@@ -4523,12 +4606,13 @@ index 00000000000..2937246a43d
 +				return;
 +			}
 +			if (result?.route === 'email' && result.outcome !== 'invalid') {
-+				handOff(result, pictureCopied);
++				handOff(result, pictureCopied, pointer);
 +				return;
 +			}
 +			failed = true; // D5: keep the message and offer retry or e-mail.
 +			update();
-+			primary.focus();
++			const focusOptions = { focusVisible: !pointer, preventScroll: true };
++			primary.focus(focusOptions);
 +		};
 +
 +		store.add(addDisposableListener(area, EventType.INPUT, () => update()));
@@ -4612,19 +4696,27 @@ index 00000000000..2937246a43d
 +		}));
 +
 +		update();
-+		// Preserve the initial centered top. Subsequent growth can only push it up enough to fit.
++		// Content changes keep the top unless it must move up to fit. A larger scrim re-centres the sheet.
 +		let top = sheet.getBoundingClientRect().top - block.getBoundingClientRect().top;
++		let blockHeight = block.clientHeight;
 +		sheet.style.alignSelf = 'flex-start';
 +		sheet.style.marginTop = `${top}px`;
 +		const observer = new (getWindow(container).ResizeObserver)(() => {
-+			const maxTop = Math.max(SHEET_VERTICAL_MARGIN, block.clientHeight - SHEET_VERTICAL_MARGIN - sheet.getBoundingClientRect().height);
-+			if (top > maxTop) {
-+				top = maxTop;
++			const height = block.clientHeight;
++			const space = height - sheet.getBoundingClientRect().height;
++			const nextTop = height > blockHeight ? space / 2 : Math.min(top, space - SHEET_VERTICAL_MARGIN);
++			blockHeight = height;
++			const clampedTop = Math.max(SHEET_VERTICAL_MARGIN, nextTop);
++			if (top !== clampedTop) {
++				top = clampedTop;
 +				sheet.style.marginTop = `${top}px`;
 +			}
++			updateFootEdge();
 +		});
 +		observer.observe(sheet);
 +		observer.observe(block);
++		observer.observe(body);
++		observer.observe(content);
 +		store.add({ dispose: () => observer.disconnect() });
 +		area.focus();
 +		area.setSelectionRange(area.value.length, area.value.length);
@@ -4632,9 +4724,8 @@ index 00000000000..2937246a43d
 +}
 +
 +async function captureWindowPicture(container: HTMLElement, nativeHost: INativeHostService): Promise<Blob | undefined> {
-+	// The native implementation accepts a target window, including auxiliary workbench windows.
-+	const getScreenshot: (rect?: undefined, options?: INativeHostOptions) => Promise<VSBuffer | undefined> = nativeHost.getScreenshot.bind(nativeHost);
-+	const jpeg = await getScreenshot(undefined, { targetWindowId: getWindow(container).vscodeWindowId });
++	// The native service's IPC context already identifies the main workbench window.
++	const jpeg = await nativeHost.getScreenshot();
 +	if (!jpeg?.byteLength || !container.isConnected) {
 +		return;
 +	}
@@ -4668,16 +4759,22 @@ index 00000000000..2937246a43d
 +	const hoverService = accessor.get(IHoverService);
 +	const nativeHost = accessor.get(INativeHostService);
 +	const container = layoutService.activeContainer;
++	const mainContainer = layoutService.mainContainer;
 +	return showRitemarkFeedbackSheet(container, spec, {
++		isMainWindow: () => getWindow(container) === getWindow(mainContainer),
 +		capturePicture: () => captureWindowPicture(container, nativeHost),
 +		copyPicture: async png => {
-+			const window = getWindow(container);
-+			const clipboard = window.navigator.clipboard;
-+			if (clipboard?.write && typeof window.ClipboardItem === 'function') {
++			const format = isMacintosh ? 'public.png' : isWindows ? 'PNG' : 'image/png';
++			const buffer = VSBuffer.wrap(new Uint8Array(await png.arrayBuffer()));
++			try {
++				await nativeHost.writeClipboardBuffer(format, buffer);
++			} catch (error) {
++				const window = getWindow(container);
++				const clipboard = window.navigator.clipboard;
++				if (!clipboard?.write || typeof window.ClipboardItem !== 'function') {
++					throw error;
++				}
 +				await clipboard.write([new window.ClipboardItem({ 'image/png': png })]);
-+			} else {
-+				const format = isMacintosh ? 'public.png' : isWindows ? 'PNG' : 'image/png';
-+				await nativeHost.writeClipboardBuffer(format, VSBuffer.wrap(new Uint8Array(await png.arrayBuffer())));
 +			}
 +		},
 +		submit: request => commandService.executeCommand<RitemarkFeedbackSubmitResult>(SUBMIT_COMMAND, request),
@@ -8188,10 +8285,10 @@ index 6851c3b584c..686f8932c2d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..b943a93dd48
+index 00000000000..6f628bb397c
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,789 @@
+@@ -0,0 +1,1046 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -8199,6 +8296,14 @@ index 00000000000..b943a93dd48
 +
 +import assert from 'assert';
 +import { mainWindow } from '../../../../base/browser/window.js';
++import { VSBuffer } from '../../../../base/common/buffer.js';
++import { isMacintosh, isWindows } from '../../../../base/common/platform.js';
++import { IClipboardService } from '../../../../platform/clipboard/common/clipboardService.js';
++import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
++import { IHoverService } from '../../../../platform/hover/browser/hover.js';
++import { ServiceIdentifier } from '../../../../platform/instantiation/common/instantiation.js';
++import { ILayoutService } from '../../../../platform/layout/browser/layoutService.js';
++import { INativeHostService } from '../../../../platform/native/common/native.js';
 +import { timeout } from '../../../../base/common/async.js';
 +import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../base/test/common/utils.js';
 +import { IRitemarkFeedbackSheetSpec, IRitemarkFeedbackSubmit, RitemarkFeedbackSubmitResult, feedbackPictureFromJpeg, ritemarkFeedbackKey, ritemarkFeedbackRoute, showRitemarkFeedbackSheet } from '../../../browser/parts/ritemarkFeedbackSheet.js';
@@ -8263,13 +8368,13 @@ index 00000000000..b943a93dd48
 +		hints: { leaveThisOut: 'Leave this out', cancel: 'Closes this', send: 'Sends it', openInEmail: 'Opens your e-mail app', tryAgain: 'Sends it again', writeFirst: 'Write something first', copy: 'Copies it', done: 'Closes this' },
 +	};
 +
-+	function open(spec: Partial<IRitemarkFeedbackSheetSpec>, submit: (request: IRitemarkFeedbackSubmit) => Promise<RitemarkFeedbackSubmitResult>, container = mainWindow.document.createElement('div'), pictureDeps?: { capturePicture?: () => Promise<Blob | undefined>; encodePicture?: (jpeg: Blob) => Promise<Blob | undefined>; copyPicture?: (png: Blob) => Promise<void>; mac?: boolean }) {
++	function open(spec: Partial<IRitemarkFeedbackSheetSpec>, submit: (request: IRitemarkFeedbackSubmit) => Promise<RitemarkFeedbackSubmitResult>, container = mainWindow.document.createElement('div'), pictureDeps?: { isMainWindow?: () => boolean; capturePicture?: () => Promise<Blob | undefined>; encodePicture?: (jpeg: Blob) => Promise<Blob | undefined>; copyPicture?: (png: Blob) => Promise<void>; mac?: boolean }) {
 +		if (!container.isConnected) {
 +			mainWindow.document.body.appendChild(container);
 +		}
 +		const copied: string[] = [];
 +		const hints = new Map<HTMLElement, () => string>();
-+		const outcome = showRitemarkFeedbackSheet(container, { token: 't', kind: 'feedback', aiIssue: false, lastAnswer: null, words, ...spec }, { submit, copy: async text => { copied.push(text); }, mac: true, ...pictureDeps, hint: (element, content) => { hints.set(element, content); return { dispose: () => hints.delete(element) }; } });
++		const outcome = showRitemarkFeedbackSheet(container, { token: 't', kind: 'feedback', aiIssue: false, lastAnswer: null, words, ...spec }, { submit, copy: async text => { copied.push(text); }, mac: true, isMainWindow: () => true, ...pictureDeps, hint: (element, content) => { hints.set(element, content); return { dispose: () => hints.delete(element) }; } });
 +		const $ = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector)!;
 +		const visible = (selector: string) => [...container.querySelectorAll<HTMLElement>(selector)].filter(element => !element.closest('[hidden]')).map(element => element.textContent);
 +		const type = (text: string) => {
@@ -8294,6 +8399,253 @@ index 00000000000..b943a93dd48
 +		failed: "The picture couldn't be copied, so the e-mail has your words only.",
 +	};
 +	const wordsWithPicture = { ...words, picture: pictureWords };
++
++	const copyHandoff = {
++		wordsButton: 'Copy words',
++		pictureButton: 'Copy picture',
++		pictureHint: 'Puts the picture back on your clipboard',
++		wordsCopied: 'Your words are on the clipboard now, in place of the picture. Paste them, then press Copy picture.',
++	};
++	const roundTwoWords = { ...words, picture: { ...pictureWords, copyHandoff } };
++	const layoutFrame = () => new Promise<void>(resolve => mainWindow.requestAnimationFrame(() => mainWindow.requestAnimationFrame(() => resolve())));
++
++	for (const scenario of ['main window context', 'native succeeds', 'web fallback succeeds', 'both writes fail'] as const) {
++		test(`picture command: ${scenario}`, async () => {
++			const canvas = mainWindow.document.createElement('canvas');
++			const jpeg = await new Promise<Blob>(resolve => canvas.toBlob(blob => resolve(blob!), 'image/jpeg'));
++			const image = VSBuffer.wrap(new Uint8Array(await jpeg.arrayBuffer()));
++			const calls: string[] = [];
++			const container = mainWindow.document.body.appendChild(mainWindow.document.createElement('div'));
++			const fakeClipboard = Object.getOwnPropertyDescriptor(mainWindow.navigator, 'clipboard');
++			const screenshotArgs: unknown[][] = [];
++			Object.defineProperty(mainWindow.navigator, 'clipboard', {
++				configurable: true,
++				value: { write: async (items: ClipboardItem[]) => {
++					calls.push('web');
++					assert.ok((await items[0].getType('image/png')).size);
++					if (scenario === 'both writes fail') {
++						throw new Error('web write failed');
++					}
++				} },
++			});
++			const services = new Map<unknown, unknown>([
++				[ILayoutService, { activeContainer: container, mainContainer: container }],
++				[ICommandService, { executeCommand: async () => {
++					calls.push('submit');
++					return { route: 'email', outcome: 'opened', kindLabel: 'Feedback', shown: 'Words', copyText: 'Words' };
++				} }],
++				[IClipboardService, {}],
++				[IHoverService, { setupManagedHover: () => ({ dispose() {} }) }],
++				[INativeHostService, {
++					getScreenshot(...args: unknown[]) { screenshotArgs.push(args); return Promise.resolve(image); },
++					async writeClipboardBuffer(format: string, buffer: VSBuffer) {
++						calls.push(format);
++						assert.ok(buffer.byteLength);
++						if (scenario === 'web fallback succeeds' || scenario === 'both writes fail') {
++							throw new Error('native write failed');
++						}
++					},
++				}],
++			]);
++			const outcome = CommandsRegistry.getCommand('_ritemark.feedbackSheet')!.handler({
++				get: <T>(id: ServiceIdentifier<T>) => services.get(id) as T,
++			}, { token: 'command', kind: 'feedback', aiIssue: false, lastAnswer: null, text: 'Words', words: roundTwoWords });
++			try {
++				await timeout(0);
++				container.querySelectorAll('input')[2].click();
++				container.querySelector<HTMLButtonElement>('button.primary')!.click();
++				for (let frame = 0; !container.querySelector('.handoff') && frame < 30; frame++) {
++					await layoutFrame();
++				}
++				assert.ok(container.querySelector('.handoff'));
++				const format = isMacintosh ? 'public.png' : isWindows ? 'PNG' : 'image/png';
++				if (scenario === 'main window context') {
++					assert.deepStrictEqual(screenshotArgs, [[]], 'use the main renderer IPC context to select the window');
++				} else {
++					assert.deepStrictEqual(calls, scenario === 'native succeeds' ? [format, 'submit'] : [format, 'web', 'submit']);
++					if (scenario === 'both writes fail') {
++						assert.strictEqual(container.querySelector('.ritemark-feedback-picture-note')?.textContent, pictureWords.failed);
++					}
++				}
++			} finally {
++				const dialog = container.querySelector<HTMLElement>('.ritemark-feedback-sheet');
++				if (dialog) {
++					escape(dialog);
++				}
++				await outcome;
++				container.remove();
++				if (fakeClipboard) {
++					Object.defineProperty(mainWindow.navigator, 'clipboard', fakeClipboard);
++				} else {
++					Reflect.deleteProperty(mainWindow.navigator, 'clipboard');
++				}
++			}
++		});
++	}
++
++	for (const late of [false, true]) {
++		test(`capture timeout opens without a picture (late result: ${late})`, async () => {
++			let finish!: (picture: Blob) => void;
++			const sheet = open({ words: roundTwoWords }, async () => null, undefined, {
++				capturePicture: () => new Promise(resolve => { finish = resolve; }),
++			});
++			try {
++				await timeout(1600);
++				assert.ok(sheet.$('textarea'));
++				assert.strictEqual(sheet.container.querySelectorAll('input').length, 2);
++				if (late) {
++					finish(new Blob(['late']));
++					await timeout(0);
++					assert.strictEqual(sheet.container.querySelectorAll('input').length, 2);
++				}
++			} finally {
++				const area = sheet.$('textarea');
++				if (area) {
++					escape(area);
++				} else {
++					mainWindow.dispatchEvent(new Event('pagehide'));
++				}
++				await sheet.outcome;
++				sheet.dispose();
++			}
++		});
++	}
++
++	test('detached windows skip capture', async () => {
++		let captures = 0;
++		const sheet = open({ words: roundTwoWords }, async () => null, undefined, {
++			isMainWindow: () => false,
++			capturePicture: async () => { captures++; return new Blob(['picture']); },
++		});
++		await timeout(0);
++		const boxes = sheet.container.querySelectorAll('input').length;
++		escape(sheet.$('textarea'));
++		await sheet.outcome;
++		sheet.dispose();
++		assert.deepStrictEqual([captures, boxes], [0, 2]);
++	});
++
++	for (const outcome of ['no-handler', 'too-long', 'opened'] as const) {
++		for (const checked of [false, true]) {
++			test(`${outcome} handoff with picture checked=${checked}`, async () => {
++				const png = new Blob(['encoded'], { type: 'image/png' });
++				let encodes = 0;
++				let copies = 0;
++				const sheet = open({ words: roundTwoWords, aiIssue: true, text: 'My words' }, async () => ({
++					route: 'email', outcome, kindLabel: 'Feedback', shown: 'My words', copyText: 'Full text',
++				}), undefined, {
++					mac: outcome !== 'too-long',
++					capturePicture: async () => new Blob(['picture']),
++					encodePicture: async () => { encodes++; return png; },
++					copyPicture: async image => {
++						assert.strictEqual(image, png);
++						if (++copies === 3) {
++							throw new Error('clipboard failed');
++						}
++					},
++				});
++				try {
++					await timeout(0);
++					if (checked) {
++						sheet.tick(2);
++					}
++					sheet.$('button.primary').click();
++					await timeout(0);
++					const retry = checked && outcome !== 'opened';
++					assert.deepStrictEqual(sheet.visible('button'), retry ? ['Copy words', 'Copy picture', 'Done'] : ['Copy', 'Done']);
++					const paste = pictureWords.paste.replace('{key}', outcome === 'too-long' ? 'Ctrl+V' : '⌘V');
++					assert.deepStrictEqual(sheet.visible('.ritemark-feedback-picture-note'), checked ? [paste] : []);
++					sheet.$('button.ghost').click();
++					await timeout(0);
++					assert.deepStrictEqual(sheet.copied, ['Full text']);
++					assert.deepStrictEqual(sheet.visible('.ritemark-feedback-picture-note'), retry ? [copyHandoff.wordsCopied] : []);
++					if (retry) {
++						const pictureButton = sheet.container.querySelectorAll<HTMLButtonElement>('button.ghost')[1];
++						assert.strictEqual(sheet.hint(pictureButton), copyHandoff.pictureHint);
++						pictureButton.click();
++						await timeout(0);
++						assert.deepStrictEqual(sheet.visible('.ritemark-feedback-picture-note'), [paste]);
++						pictureButton.click();
++						await timeout(0);
++						assert.deepStrictEqual(sheet.visible('.ritemark-feedback-picture-note'), [pictureWords.failed]);
++						assert.strictEqual(encodes, 1);
++						assert.strictEqual(copies, 3);
++					}
++				} finally {
++					sheet.$('button.primary').click();
++					await sheet.outcome;
++					sheet.dispose();
++				}
++			});
++		}
++	}
++
++	for (const check of ['footer', 'recenter'] as const) {
++		test(`short-window layout: ${check}`, async () => {
++			const container = mainWindow.document.createElement('div');
++			container.className = 'monaco-workbench ritemark-feedback-short-test';
++			container.style.setProperty('--rm-hairline', 'blue');
++			const style = container.appendChild(mainWindow.document.createElement('style'));
++			style.textContent = '.ritemark-feedback-short-test .ritemark-feedback-block { height: 360px; }';
++			const sheet = open({ words: roundTwoWords }, async () => null, container, { capturePicture: async () => new Blob(['picture']) });
++			try {
++				await timeout(0);
++				sheet.tick(2);
++				await layoutFrame();
++				const dialog = sheet.$('.ritemark-feedback-sheet');
++				const block = sheet.$('.ritemark-feedback-block');
++				if (check === 'recenter') {
++					block.style.height = '800px';
++					await layoutFrame();
++					const box = dialog.getBoundingClientRect();
++					assert.ok(Math.abs(box.top + box.height / 2 - 400) < 1);
++				} else {
++					const body = sheet.$('.ritemark-feedback-body');
++					const foot = sheet.$('.ritemark-feedback-foot');
++					assert.ok(body && body.scrollHeight > body.clientHeight);
++					assert.strictEqual(dialog.getBoundingClientRect().bottom, 328);
++					const buttonTops = [...foot.querySelectorAll('button:not([hidden])')].map(button => button.getBoundingClientRect().top);
++					assert.ok(buttonTops.every(top => top >= body.getBoundingClientRect().bottom && top + 32 <= 328));
++					body.scrollTop = 10;
++					await layoutFrame();
++					assert.notStrictEqual(mainWindow.getComputedStyle(foot).boxShadow, 'none');
++					body.scrollTop = body.scrollHeight;
++					await layoutFrame();
++					assert.strictEqual(mainWindow.getComputedStyle(foot).boxShadow, 'none');
++					assert.deepStrictEqual([...foot.querySelectorAll('button:not([hidden])')].map(button => button.getBoundingClientRect().top), buttonTops);
++					sheet.tick(2);
++					await layoutFrame();
++					assert.strictEqual(mainWindow.getComputedStyle(foot).boxShadow, 'none');
++				}
++			} finally {
++				escape(sheet.$('textarea'));
++				await sheet.outcome;
++				sheet.dispose();
++			}
++		});
++	}
++
++	test('feedback buttons and the quote remove button keep only the keyboard ring', async () => {
++		const sheet = open({ text: 'Words', quote: { title: 'Card', line: 'Details' } }, async () => null);
++		sheet.container.classList.add('monaco-workbench');
++		sheet.container.style.setProperty('--vscode-focusBorder', 'blue');
++		try {
++			for (const selector of ['button.primary', 'button.ghost', '.ritemark-feedback-card-remove']) {
++				const button = sheet.$(selector);
++				const pointer = { focusVisible: false, preventScroll: true };
++				button.focus(pointer);
++				assert.strictEqual(mainWindow.getComputedStyle(button).outlineStyle, 'none', selector);
++				sheet.$('textarea').focus();
++				const keyboard = { focusVisible: true, preventScroll: true };
++				button.focus(keyboard);
++				assert.strictEqual(mainWindow.getComputedStyle(button).outlineWidth, '2px', selector);
++			}
++		} finally {
++			escape(sheet.$('textarea'));
++			await sheet.outcome;
++			sheet.dispose();
++		}
++	});
 +
 +	for (const hasWords of [true, false]) {
 +		test(hasWords ? 'capture failure omits the picture controls' : 'older words omit the picture controls and skip capture', async () => {
@@ -8669,6 +9021,7 @@ index 00000000000..b943a93dd48
 +				await timeout(0);
 +				assert.strictEqual(sheet.$('.ritemark-feedback-title').textContent, 'Your e-mail app is opening');
 +				assert.notStrictEqual(mainWindow.document.activeElement, opener);
++				assert.strictEqual(sheet.$('button.primary').matches(':focus-visible'), false);
 +			}
 +			const keyboard = action === 'Escape' || action === 'keyboard Cancel';
 +			if (action === 'Escape') {
@@ -8931,8 +9284,9 @@ index 00000000000..b943a93dd48
 +
 +		const offline = open({}, async () => ({ route: 'straight', outcome: 'failed' }));
 +		offline.type('Nice.');
-+		offline.$<HTMLButtonElement>('.ritemark-feedback-button.primary').click();
++		press(offline.$('.ritemark-feedback-button.primary'));
 +		await timeout(0);
++		assert.strictEqual(offline.$('button.primary').matches(':focus-visible'), false);
 +		assert.deepStrictEqual(offline.visible('.ritemark-feedback-problem'), ['It didn\'t go. Your message is still here: try again, or open it in e-mail.']);
 +		assert.deepStrictEqual(offline.visible('.ritemark-feedback-button'), ['Cancel', 'Open in e-mail', 'Try again'], 'D5: Try again and Open in e-mail');
 +		assert.ok(offline.$('.ritemark-feedback-foot').classList.contains('stacked'), 'three buttons: the note on its own line');
