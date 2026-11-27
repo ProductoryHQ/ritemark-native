@@ -27,7 +27,7 @@ import { isMac } from '../../../hooks/usePlatform'
 import { useDismissOnOutside } from '../../../lib/dismissOnOutside'
 import { setBlockValue } from './slideCommands'
 import {
-  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
+  AGENDA_TIP, BAR_KIND_LABEL, FOLD_AT, HANDLE_SIZE, MARK_LABEL, MARK_MENU_TIP, MARK_TIP, MAX_FOLD, REVEAL_LABEL, REVEAL_TIP, MAX_COLUMNS, addItem, barGap, barLeft, barLeftPastPane, boxIconMenuReturnFocus, caretBoxIcon, caretBoxPos, chosenBlockAt, columnCount, columnShares, deleteBlock, divAttributesOf,
   dropGaps, gripSpot, iconSpot, isBoxIconShortcut, moveBlock, nearestGap, plusSpot, revealsOneBlock, ringGap, setBoxesMark, setColumnCount, setColumnSplit, setReveal, splitGuideX, splitPlace, turnInto, typeMenuKinds, type BarKind, type Box,
   type BoxIconMenuCloseReason, type ChosenBlock,
 } from './blockBar'
@@ -138,13 +138,14 @@ function Group({ label, options, folded, tip, bare = false, icon }: { label: str
   if (!folded) return <Segment label={label}>{options.map(option => <Choice key={option.key} on={option.on} label={option.label} icon={option.icon} tip={option.tip} onPick={option.pick} />)}</Segment>
   const current = options.find(option => option.on) ?? options[0]
   const hasIcons = options.some(option => option.icon)
+  const triggerIcon = icon ?? current.icon
   return (
     <DropdownMenu modal={false}>
       <Tooltip label={tip ?? (bare ? `${label}: ${current.label ?? current.tip}` : label)}>
         <DropdownMenuTrigger asChild>
           <Button variant="toolbar" size="compact" aria-label={`${label}: ${current.label ?? current.tip}`} onMouseDown={event => event.preventDefault()}>
-            {icon ?? current.icon ? <Icon name={(icon ?? current.icon)!} size={16} tone="inherit" /> : null}
-            {bare && current.icon ? null : current.label}
+            {triggerIcon ? <Icon name={triggerIcon} size={16} tone="inherit" /> : null}
+            {bare && triggerIcon ? null : current.label}
             <Icon name="caret-down" size={12} tone="inherit" />
           </Button>
         </DropdownMenuTrigger>
@@ -432,6 +433,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
   // into menus that show their value, from the right: alignment, then the count, then Style. A new block or
   // a new pane width starts again unfolded.
   const [fold, setFold] = useState(0)
+  const iconOnly = fold >= FOLD_AT.words
   const foldKey = `${chosen?.pos}:${chosen?.kind}:${placed ? Math.round(placed.pane.right - placed.pane.left) : 0}`
   useEffect(() => { setFold(0) }, [foldKey])
   useLayoutEffect(() => {
@@ -441,6 +443,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
       focusIcon.current = false
       iconTrigger.current.focus({ preventScroll: true })
     }
+    // The max-content row includes every control, separator, gap and the bar padding.
     const width = bar.getBoundingClientRect().width
     const height = bar.offsetHeight
     const room = window.innerHeight
@@ -448,7 +451,8 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
     if (top + height > room - 8) top = Math.max(8, placed.screen.top - height - 8)
     const inPane = barLeft(placed.screen.left, width, placed.pane, window.innerWidth)
     if (inPane === null && fold < MAX_FOLD) { setFold(fold + 1); return }
-    const left = inPane ?? Math.max(8, placed.pane.left + 8)
+    // At the last fold, keep the row intact: past the pane if it must be, never past the window (Add and Delete stay).
+    const left = inPane ?? barLeftPastPane(width, placed.pane, window.innerWidth)
     setBarAt(current => (current && current.left === left && current.top === top ? current : { left, top }))
     // Again only when the block moves, the bar's contents change (its width) or it folds: never on its own update.
   }, [barShowing, placed, chosen, drag, fold])
@@ -739,10 +743,6 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
               style={{
                 left: barAt?.left ?? -9999,
                 top: barAt?.top ?? -9999,
-                ...(fold === MAX_FOLD ? {
-                  maxWidth: Math.max(0, Math.min(window.innerWidth - 8, placed.pane.right - 8) - Math.max(8, placed.pane.left + 8)),
-                  flexWrap: 'wrap',
-                } : {}),
               }}
             >
               {agenda ? (
@@ -756,9 +756,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
               <DropdownMenu modal={false}>
                 <Tooltip label="Turn this block into another kind">
                   <DropdownMenuTrigger asChild>
-                    <Button variant="toolbar" size="compact" className="deck-bar-type" onMouseDown={event => event.preventDefault()}>
+                    <Button variant="toolbar" size="compact" className="deck-bar-type" aria-label={BAR_KIND_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()}>
                       <Icon name={KIND_ICON[chosen.kind]} size={16} tone="inherit" />
-                      {BAR_KIND_LABEL[chosen.kind]}
+                      {!iconOnly && BAR_KIND_LABEL[chosen.kind]}
                       <Icon name="caret-down" size={12} tone="inherit" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -783,7 +783,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
                 <>
                   <Sep />
                   {/* The theme's own style writes nothing: only a block that differs from it carries `fill`. */}
-                  <Group label="Style" folded={fold >= FOLD_AT.style} options={[
+                  <Group label="Style" folded={fold >= FOLD_AT.style} bare={iconOnly} icon={iconOnly ? (fill === 'filled' ? 'square-half' : 'square') : undefined} options={[
                     { key: 'filled', on: fill === 'filled', label: 'Filled', tip: "Boxes filled with the theme's colour", pick: () => setValue('fill', theme.boxes === 'filled' ? null : 'filled') },
                     { key: 'outline', on: fill === 'outline', label: 'Outline', tip: 'Boxes drawn as an outline', pick: () => setValue('fill', theme.boxes === 'outline' ? null : 'outline') },
                   ]} />
@@ -800,7 +800,7 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
                   }))} />
                   {boxIconButton}
                   <Sep />
-                  <Group label="Size" folded icon="columns" tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
+                  <Group label="Size" folded bare={iconOnly} icon="columns" tip={`Size: ${look.width ? BOX_SIZE_LABEL[look.width] : 'Auto'}`} options={[
                     { key: 'auto', on: !look.width, icon: 'columns', label: 'Auto', tip: 'Auto', pick: () => setValue('width', null) },
                     ...(['s', 'm', 'l'] as BoxWidth[]).map(width => ({ key: width, on: look.width === width, label: BOX_SIZE_LABEL[width], tip: BOX_SIZE_LABEL[width], pick: () => setValue('width', width) })),
                   ]} />
@@ -850,9 +850,9 @@ export function SlideBlockBar({ editor, frame, theme, apply, pickIcon, settingsO
               <Sep />
               {agenda ? null : (
                 <Tooltip label={canAdd ? ADD_LABEL[chosen.kind] : `A Columns block holds ${MAX_COLUMNS} columns at most`}>
-                  <Button variant="toolbar" size="compact" disabled={!canAdd} onMouseDown={event => event.preventDefault()} onClick={add}>
+                  <Button variant="toolbar" size="compact" disabled={!canAdd} aria-label={ADD_LABEL[chosen.kind]} onMouseDown={event => event.preventDefault()} onClick={add}>
                     <Icon name="plus" size={16} tone="inherit" />
-                    Add
+                    {!iconOnly && 'Add'}
                   </Button>
                 </Tooltip>
               )}

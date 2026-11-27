@@ -71,8 +71,9 @@ export const REVEAL_TIP = 'In Present, show the items one by one: the slide open
  * Style, and last Boxes' Mark (Sprint 167 PR 2), a menu already, which keeps its value as its icon only, the word in its
  * tooltip. `fold` counts the folds; a group is folded from its number on.
  */
-export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4, mark: 5 } as const
-export const MAX_FOLD = FOLD_AT.mark
+// `words`, last (27 November): the type, Style, Size and Add drop their words for their icons, so the bar never wraps.
+export const FOLD_AT = { alignment: 1, reveal: 2, size: 3, style: 4, mark: 5, words: 6 } as const
+export const MAX_FOLD = FOLD_AT.words
 
 /** A Columns block holds two to four columns from the bar (more can be written, and are kept). */
 export const MIN_COLUMNS = 2
@@ -853,6 +854,15 @@ export function iconSpot(box: Box, scale: number): { left: number; top: number }
  * The bar's left edge: under the block, inside the slide's pane (8 px from its edges, the divider included: the
  * Experience lead on #773), and on the window. Null when the bar is wider than the pane: its own group then folds.
  */
+/**
+ * Where the bar goes when even its last fold is wider than the pane (27 November, the bar never wraps): inside the
+ * window, as far left as the pane allows and further over the strip if it must, so its last buttons (Add, Delete) are
+ * never cut off at the window's right edge.
+ */
+export function barLeftPastPane(width: number, pane: { left: number }, windowWidth: number): number {
+  return Math.max(8, Math.min(pane.left + 8, windowWidth - 8 - width))
+}
+
 export function barLeft(blockLeft: number, width: number, pane: { left: number; right: number }, windowWidth: number): number | null {
   const min = Math.max(8, pane.left + 8)
   const max = Math.min(windowWidth - 8, pane.right - 8) - width
