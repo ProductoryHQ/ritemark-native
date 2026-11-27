@@ -35,7 +35,6 @@ assert.equal(FEEDBACK_COPY.handoff.opened.report, "Your report is in a new e-mai
 assert.equal(FEEDBACK_COPY.sheet.shortenedNote, 'Shortened to fit an e-mail. Copy takes the whole answer.', 'D10');
 assert.equal(REPORT_RECIPIENT, 'info@productory.eu', 'the shape\'s decision 7');
 
-// Sprint 126's honesty rule over every e-mail-route string: no word claims a delivery Ritemark cannot see (S58)
 test('the picture copy handoff uses the lead’s words', () => {
   assert.deepEqual(FEEDBACK_COPY.picture.copyHandoff, {
     wordsButton: 'Copy words',
@@ -45,6 +44,7 @@ test('the picture copy handoff uses the lead’s words', () => {
   });
 });
 
+// Sprint 126's honesty rule over every e-mail-route string: no word claims a delivery Ritemark cannot see (S58)
 for (const words of emailRouteStrings()) {
   for (const claim of DELIVERY_CLAIM_WORDS) {
     assert.ok(!new RegExp(`\\b${claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(words), `"${words}" claims "${claim}"`);

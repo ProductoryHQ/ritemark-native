@@ -3555,10 +3555,10 @@ index afa6942390e..a41b0cfe9a9 100644
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
 new file mode 100644
-index 00000000000..0dbebe5a47a
+index 00000000000..75129e8f02a
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,357 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3910,6 +3910,12 @@ index 00000000000..0dbebe5a47a
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button .codicon {
 +	font-size: 14px;
 +}
++
++/* Dark themes: the sheet's own scrollbars (the body, the hand-off's words) follow the theme, not a white track. */
++.monaco-workbench.vs-dark .ritemark-feedback-sheet,
++.monaco-workbench.hc-black .ritemark-feedback-sheet {
++	color-scheme: dark;
++}
 diff --git a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts b/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
 index 38e722820da..f9fbe8c1a61 100644
 --- a/src/vs/workbench/browser/parts/notifications/notificationsCenter.ts
@@ -4046,10 +4052,10 @@ index 252bcf8..718e4a1 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..5abbaa6445b
+index 00000000000..847371e4940
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,748 @@
+@@ -0,0 +1,749 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4489,7 +4495,8 @@ index 00000000000..5abbaa6445b
 +			clearPreview();
 +			picture = undefined;
 +			const opened = result.outcome === 'opened';
-+			const copyHandoff = !opened && pictureCopied !== undefined ? pictureWords?.copyHandoff : undefined;
++			// The words/picture pair only when the picture really went on the clipboard (review round 2, finding 8).
++			const copyHandoff = !opened && pictureCopied === true ? pictureWords?.copyHandoff : undefined;
 +			const outcome = opened ? words.handoff.opened : result.outcome === 'too-long' ? words.handoff.tooLong : words.handoff.noHandler;
 +			content.replaceChildren();
 +			foot.replaceChildren();
@@ -8285,10 +8292,10 @@ index 6851c3b584c..686f8932c2d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..6f628bb397c
+index 00000000000..0bc499a2114
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,1046 @@
+@@ -0,0 +1,1065 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -8523,6 +8530,25 @@ index 00000000000..6f628bb397c
 +		await sheet.outcome;
 +		sheet.dispose();
 +		assert.deepStrictEqual([captures, boxes], [0, 2]);
++	});
++
++	test('a picture that never reached the clipboard gets the plain Copy, not the words/picture pair', async () => {
++		const sheet = open({ words: roundTwoWords, aiIssue: true, text: 'My words' }, async () => ({
++			route: 'email', outcome: 'too-long', kindLabel: 'Feedback', shown: 'My words', copyText: 'Full text',
++		}), undefined, {
++			mac: true,
++			capturePicture: async () => new Blob(['picture']),
++			encodePicture: async () => undefined,
++			copyPicture: async () => { throw new Error('never called'); },
++		});
++		await timeout(0);
++		sheet.tick(2);
++		sheet.$('button.primary').click();
++		await timeout(0);
++		assert.deepStrictEqual(sheet.visible('button'), ['Copy', 'Done']);
++		sheet.$<HTMLButtonElement>('button.primary').click();
++		await sheet.outcome;
++		sheet.dispose();
 +	});
 +
 +	for (const outcome of ['no-handler', 'too-long', 'opened'] as const) {
