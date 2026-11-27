@@ -12,7 +12,7 @@ export type UpdateNotificationChoice = 'install' | 'later' | 'skip' | 'pause';
 // buttons squeezed VS Code's "Source: Ritemark" label to a stray "S". Skip
 // and pause stay in Settings → Updates ("Skip this version", "Remind me in 7 days").
 const FULL_UPDATE_ACTIONS = {
-  INSTALL: 'Download installer',
+  INSTALL: 'Download the installer',
   LATER: 'Later'
 } as const;
 

@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The update notice now shows two buttons, **Download installer** and **Later**, so nothing in it is cut off. Skip this version and Remind me in 7 days stay in Settings → Updates (#1120).
+- The update notice now shows two buttons, **Download the installer** and **Later**, so nothing in it is cut off. Skip this version and Remind me in 7 days stay in Settings → Updates (#1120).
 - A deck's own folder is now named after the deck file (`Kickoff.rtms.files`). It follows the deck, or goes to the Trash with it, only when it holds nothing but the deck's pictures and its published page. A folder with other files stays where it is.
 - Copying cells in the Excel viewer now puts their text on the clipboard (#1038).
 - Published pictures now leave out location, camera, and author details, and Publish tells you when it has to leave a picture out (#999).

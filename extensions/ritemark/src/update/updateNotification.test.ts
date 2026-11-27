@@ -30,9 +30,9 @@ const manifest = { version: '2.4.0', releaseNotes: '', files: [] } as any;
 (async () => {
   shown.length = 0; answer = undefined;
   assert.equal(await showFullUpdateNotification(manifest), 'later', 'closing the notice is Later');
-  assert.deepEqual(shown[0].slice(2), ['Download installer', 'Later'], 'a full update offers two buttons');
+  assert.deepEqual(shown[0].slice(2), ['Download the installer', 'Later'], 'a full update offers two buttons');
 
-  answer = 'Download installer';
+  answer = 'Download the installer';
   assert.equal(await showFullUpdateNotification(manifest), 'install');
 
   shown.length = 0; answer = 'Install update';
