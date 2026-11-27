@@ -403,7 +403,8 @@ export class DeckPages implements vscode.Disposable {
     const type = (message as { type?: unknown } | null)?.type;
     if (type === DECK_FAILURE_FEEDBACK_MESSAGE) {
       const line = this.publishFailures.get(webview);
-      const options = line && decodeFailureFeedbackOpen((message as { options?: unknown }).options, { title: PUBLISH_FAILURE_TITLE, line });
+      const options = decodeFailureFeedbackOpen((message as { options?: unknown }).options,
+        line === undefined ? undefined : { title: PUBLISH_FAILURE_TITLE, line });
       if (options) await vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
       return;
     }

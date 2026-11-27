@@ -27,7 +27,7 @@ import { showPublishSheet } from './PublishSheetPanel';
 import type { WebPagesSettingsProjection } from './settingsProtocol';
 import type { SheetOptions } from './sheetModel';
 import { FEEDBACK_OPEN_COMMAND, showBriefToast } from '../feedback/feedbackSheet';
-import { failureFeedbackOptions, isSafeFailureFeedbackPart, PUBLISH_FAILURE_TITLE } from '../feedback/feedbackQuoteSafety';
+import { failureFeedbackOptions, isSafeFailureFeedbackPart } from '../feedback/feedbackQuoteSafety';
 
 export const PUBLISH_READY_CONTEXT = 'ritemark.publish.ready';
 export const UNPUBLISH_PAGE_COMMAND = 'ritemark.page.unpublish';
@@ -40,10 +40,10 @@ export const BAR_REFRESH_COMMAND = '_ritemark.browser.publishStateChanged';
 const OPEN_SETTINGS = 'Open Settings';
 const FAILURE_FEEDBACK = 'Tell us about this';
 
-function showPublishWarning(line: string, recovery: string, recover: () => void, quoteSafe = true): void {
+function showPublishWarning(title: string, line: string, recovery: string, recover: () => void, quoteSafe = true): void {
   const shown = plainLine(line);
   const options = quoteSafe && isSafeFailureFeedbackPart(line)
-    ? failureFeedbackOptions(PUBLISH_FAILURE_TITLE, shown)
+    ? failureFeedbackOptions(title, shown)
     : { from: 'failure_card' };
   void vscode.window.showWarningMessage(shown, recovery, FAILURE_FEEDBACK).then((pick) => {
     if (pick === recovery) recover();
@@ -175,7 +175,7 @@ export function createPublishFeature(
         const answer = await showPublishSheet(context, plan, { ...options, setup, onConfirm });
         return answer;
       },
-      showFailure: (line, retry, quoteSafe) => showPublishWarning(line, 'Try again', retry, quoteSafe),
+      showFailure: (line, retry, title, quoteSafe) => showPublishWarning(title, line, 'Try again', retry, quoteSafe),
       // The bar's Unpublish past 10 s: a line that stays while Cloudflare takes the page down, closed when it is down
       showWaiting: (line) => {
         let done: () => void = () => undefined;
@@ -186,7 +186,7 @@ export function createPublishFeature(
       // M6's wait and its end: patch 018's brief toast, which goes by itself (an ordinary message in a shell without it)
       showBrief: (line) => { void showBriefToast(plainLine(line)); },
       // The bar's Unpublish signed out or on another account: Settings ▸ Sharing ▸ Web pages is where Cloudflare is connected
-      showConnect: (line, quoteSafe) => showPublishWarning(line, OPEN_SETTINGS, () => {
+      showConnect: (line, title, quoteSafe) => showPublishWarning(title, line, OPEN_SETTINGS, () => {
         void vscode.commands.executeCommand('ritemark.aiSettings', 'web-pages');
       }, quoteSafe),
     },

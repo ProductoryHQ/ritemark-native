@@ -10,7 +10,7 @@
  * Kept in step (README decision 5): scrolling the handout changes the slide; choosing a thumbnail scrolls the handout
  * to its part; writing in a part makes its slide the current one.
  */
-import { DeckPublishFeedbackLink } from './DeckPublishFeedbackLink'
+import { PublishFailureFeedbackLink } from './PublishFailureFeedbackLink'
 import { Fragment as ReactFragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type CSSProperties, type ReactNode } from 'react'
 import { updateDeckFailures } from './deckFailures'
 import { matchesKeyPreview } from '../../../../src/decks/keyPreview'
@@ -263,6 +263,14 @@ function fitDeckBar(bar: HTMLElement, notice: HTMLSpanElement, measure: CanvasRe
   if (last && last.getBoundingClientRect().right > right + 0.01) {
     bar.setAttribute('data-theme-compact', '')
     roomChanged()
+  }
+
+  const feedback = notice.querySelector<HTMLElement>('.deck-publish-feedback')
+  if (feedback) {
+    feedback.removeAttribute('data-link-clipped')
+    const failureWords = notice.querySelectorAll<HTMLElement>('.deck-failure-words > .deck-notice-text')
+    // Give the failure reason back the link's room whenever the two cannot fit together.
+    feedback.toggleAttribute('data-link-clipped', Array.from(failureWords).some(words => words.scrollWidth > words.clientWidth))
   }
 
   // Measure with all words in flow so a collapsed note can return when there is room.
@@ -2250,6 +2258,7 @@ export function DeckView({
   const needCaret = useCallback(() => setNotice({ text: 'Click on the slide where it should split, then Split at the cursor.' }), [])
   // PR 3 (frame 24; README, "Nothing around the slide but the slide": in the deck's bar while that slide is current).
   // Nothing moves to a new slide by itself: Split at the cursor does it, where the caret is.
+  const publishFailure = failures.get('publish')
   const fullLine = (
     <>
       <Tooltip label={SLIDE_FULL} className="deck-notice-words">
@@ -2291,7 +2300,10 @@ export function DeckView({
               onCommit={time => commitMinutes(shown, time)} />
           ) : slideCountWithMinutes(countLabel, shownTiming)}
         </span>
-        <span className="deck-notice" ref={barNoticeRef} role="status" aria-live="polite">
+        <span className="deck-notice" ref={barNoticeRef}>
+          <span className="sr-only" role="status" aria-live="polite">
+            {[...failures.values(), notice?.text, slideFull && slideShown && (!notice || notice.withFull) ? SLIDE_FULL : null].filter(Boolean).join(' ')}
+          </span>
           {Array.from(failures).map(([operation, text]) => (
             <ReactFragment key={operation}>
               <Tooltip label={text} className="deck-notice-warning">
@@ -2302,7 +2314,6 @@ export function DeckView({
               <span className="inline-flex deck-notice-words deck-failure-words" aria-hidden="true">
                 <span className="deck-notice-text">{text}</span>
               </span>
-              <DeckPublishFeedbackLink operation={operation} line={text} />
             </ReactFragment>
           ))}
           {notice ? (
@@ -2353,6 +2364,7 @@ export function DeckView({
               {notice.withFull && slideFull && slideShown ? fullLine : null}
             </>
           ) : slideFull && slideShown ? fullLine : null}
+          {publishFailure !== undefined && <PublishFailureFeedbackLink operation="publish" line={publishFailure} />}
         </span>
         <span className="deck-bar-spacer" />
         {/* Only with the slide shown: a comment opens on the slide, under what it is on. */}

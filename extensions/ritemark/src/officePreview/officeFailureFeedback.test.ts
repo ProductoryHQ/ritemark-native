@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import type * as vscode from 'vscode';
 import { OfficeDocument } from './officeDocument';
 
-test('Office host accepts feedback for the current read-error card only', async () => {
+test('Office host quotes only the current read error and opens plain feedback for stale requests', async () => {
   const commands: unknown[][] = [];
   const replies: Record<string, unknown>[] = [];
   let receive: (message: unknown) => Promise<void>;
@@ -38,7 +38,8 @@ test('Office host accepts feedback for the current read-error card only', async 
       await receive!({ type: 'ready' });
       assert.equal(replies.at(-1)?.feedback, undefined);
       await request({ from: 'failure_card' });
-      assert.equal(commands.length, count);
+      const plain = ['ritemark.feedback.open', { from: 'failure_card' }];
+      assert.deepEqual(commands.slice(count), [plain]);
 
       enabled = true;
       await receive!({ type: 'ready' });
@@ -52,14 +53,14 @@ test('Office host accepts feedback for the current read-error card only', async 
         { ...options, quote: { title: card.title, line: 'Arbitrary words' } }]) {
         await request(invalid);
       }
-      assert.equal(commands.length, count);
+      assert.deepEqual(commands.slice(count), [plain, plain, plain, plain, plain]);
       await request(options);
       assert.deepEqual(commands.at(-1), ['ritemark.feedback.open', options]);
 
       enabled = false;
       await receive!({ type: 'ready' });
       await request(options);
-      assert.equal(commands.length, count + 1);
+      assert.deepEqual(commands.slice(count + 6), [plain]);
     }
   } finally {
     loader._load = load;

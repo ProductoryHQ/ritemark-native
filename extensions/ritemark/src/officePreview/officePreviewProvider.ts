@@ -160,7 +160,7 @@ export class OfficePreviewProvider implements vscode.CustomReadonlyEditorProvide
       switch (message?.type) {
         case OFFICE_FAILURE_FEEDBACK_MESSAGE: {
           const shown = this.shownFailures.get(webviewPanel.webview);
-          const options = shown && decodeFailureFeedbackOpen(message.options, shown);
+          const options = decodeFailureFeedbackOpen(message.options, shown);
           if (options) await vscode.commands.executeCommand(FEEDBACK_OPEN_COMMAND, options);
           break;
         }

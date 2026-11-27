@@ -1,3 +1,4 @@
+import { failureFeedbackOptions } from './feedbackQuoteSafety';
 /**
  * Sprint 140 (R10–R14, E3; S51–S58): the feedback door's rules. Its words in one table, the e-mail route's
  * words free of any delivery claim (Sprint 126's honesty test), the route from the two boxes, the last answer
@@ -377,4 +378,25 @@ test('feedback command validates the open and binds submissions to its card and 
     await sheet.close('sent');
     assert.deepEqual(toasts, [FEEDBACK_COPY.toast.accepted]);
   });
+});
+
+test('failure-card quote safety recognises paths and preserves normal slash wording', () => {
+  const title = 'Card';
+  for (const line of [
+    "You've used Claude's limit for now. It resets at 3pm (Europe/Tallinn).",
+    'A/B', 'and/or', '/login', 'Error 404: /v1/messages', 'Open Notes.docx.',
+  ]) {
+    assert.deepEqual(failureFeedbackOptions(title, line), { from: 'failure_card', quote: { title, line } }, line);
+  }
+  for (const line of [
+    'Could not read /Users/example/file.txt', 'Could not read ./private/file.txt',
+    'Could not read /a/b', 'Could not read /report.docx', 'Could not read ~/Notes',
+    'Could not read ../Notes', 'Could not read a/b/c', 'Could not read dir/file.docx',
+    'Could not read project/Private notes.docx',
+    String.raw`Could not read C:\Notes`, String.raw`Could not read \\server\share`,
+    'Request failed at https://example.test/?token=example', '{"error":"raw provider payload"}',
+    'TypeError: raw renderer diagnostics',
+  ]) {
+    assert.deepEqual(failureFeedbackOptions(title, line), { from: 'failure_card' }, line);
+  }
 });

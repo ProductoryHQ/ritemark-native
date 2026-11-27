@@ -34,16 +34,22 @@ test('Publish warnings keep recovery first and quote only safe visible words', a
     const retry = () => { retries++; };
     const title = "Publish didn't go";
 
-    ui.showFailure('Try   publishing (again).', retry);
+    ui.showFailure('Try   publishing (again).', retry, title);
     await Promise.resolve();
     assert.deepEqual(warnings.at(-1), ['Try publishing again .', 'Try again', 'Tell us about this']);
     assert.deepEqual(feedback(), ['ritemark.feedback.open', { from: 'failure_card', quote: { title, line: warnings.at(-1)![0] } }]);
     assert.equal(retries, 0);
 
-    ui.showConnect('Connect Cloudflare first.');
+    ui.showConnect('Connect Cloudflare first.', "Unpublish didn't go");
     await Promise.resolve();
     assert.deepEqual(warnings.at(-1), ['Connect Cloudflare first.', 'Open Settings', 'Tell us about this']);
-    assert.deepEqual(feedback(), ['ritemark.feedback.open', { from: 'failure_card', quote: { title, line: 'Connect Cloudflare first.' } }]);
+    assert.deepEqual(feedback(), ['ritemark.feedback.open', { from: 'failure_card', quote: { title: "Unpublish didn't go", line: 'Connect Cloudflare first.' } }]);
+
+    ui.showFailure('The page is still online.', retry, "Unpublish didn't go");
+    await Promise.resolve();
+    assert.deepEqual(feedback(), ['ritemark.feedback.open', {
+      from: 'failure_card', quote: { title: "Unpublish didn't go", line: 'The page is still online.' },
+    }]);
 
     for (const line of [
       'Could not read project/Private notes.docx',
@@ -52,17 +58,17 @@ test('Publish warnings keep recovery first and quote only safe visible words', a
       '["raw provider response"]',
       'Error: fetch failed',
     ]) {
-      ui.showFailure(line, retry);
+      ui.showFailure(line, retry, title);
       await Promise.resolve();
       assert.deepEqual(feedback(), ['ritemark.feedback.open', { from: 'failure_card' }], line);
     }
 
     selection = 'Try again';
-    ui.showFailure('Check your connection.', retry);
+    ui.showFailure('Check your connection.', retry, title);
     await Promise.resolve();
     assert.equal(retries, 1);
     selection = 'Open Settings';
-    ui.showConnect('Connect Cloudflare first.');
+    ui.showConnect('Connect Cloudflare first.', "Unpublish didn't go");
     await Promise.resolve();
     assert.deepEqual(commands.at(-1), ['ritemark.aiSettings', 'web-pages']);
   } finally {

@@ -517,24 +517,26 @@ export function PPTXViewer({ content, filename, loadError }: PPTXViewerProps) {
             <Icon name="warning-circle" size={20} tone="active" />
             <div className="font-ui text-[15px] font-medium text-ink-strong">{failure.title}</div>
             <div className="font-ui text-[13px] text-ink-muted">{failure.detail}</div>
-            <div className={failure.feedback ? "mt-1 flex w-full flex-wrap items-center gap-2" : "mt-1 flex gap-2"}>
+            <div className="mt-1">
+              <div className="flex justify-center gap-2">
+                <Tooltip label="Read the file from disk again">
+                  <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
+                    <Icon name="arrow-clockwise" size={14} />
+                    Try again
+                  </Button>
+                </Tooltip>
+                <Tooltip label="See the presentation in PowerPoint or another app">
+                  <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
+                    <Icon name="arrow-square-out" size={14} />
+                    {openLabel}
+                  </Button>
+                </Tooltip>
+              </div>
               {failure.feedback && (
-                <span className="mr-auto">
+                <div className="mt-2 flex justify-center">
                   <FailureFeedbackLink title={failure.title} line={failure.detail} messageType={OFFICE_FAILURE_FEEDBACK_MESSAGE} />
-                </span>
+                </div>
               )}
-              <Tooltip label="Read the file from disk again">
-                <Button type="button" variant="outline" size="sm" className="whitespace-nowrap" onClick={handleRefresh}>
-                  <Icon name="arrow-clockwise" size={14} />
-                  Try again
-                </Button>
-              </Tooltip>
-              <Tooltip label="See the presentation in PowerPoint or another app">
-                <Button type="button" size="sm" className="whitespace-nowrap" onClick={handleOpenExternally}>
-                  <Icon name="arrow-square-out" size={14} />
-                  {openLabel}
-                </Button>
-              </Tooltip>
             </div>
           </div>
         </div>

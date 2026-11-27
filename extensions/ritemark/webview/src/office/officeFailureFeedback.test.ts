@@ -42,12 +42,18 @@ function clickFeedback() {
   button.dispatchEvent(click);
 }
 
-test('Word and PowerPoint read errors offer feedback in the card footer', () => {
+test('Word and PowerPoint read errors offer feedback below the centred recovery actions', () => {
   for (const fileType of ['docx', 'pptx']) {
     const title = 'This file is damaged';
     const detail = 'Try opening Example.' + fileType + ' in another app.';
     show({ fileType, title, detail, feedback: true });
-    assert.match(container.textContent ?? '', /Tell us about this\s*Try again/);
+    const retry = Array.from(container.querySelectorAll('button')).find(node => node.textContent?.trim() === 'Try again');
+    const link = feedbackButton();
+    assert.match(container.textContent ?? '', /Try again\s*Open in (?:Word|PowerPoint)\s*Tell us about this/);
+    assert.ok(retry?.closest('.justify-center.gap-2'));
+    assert.ok(link?.closest('.mt-2.justify-center'));
+    assert.ok(link?.classList.contains('text-xs'));
+    assert.ok(link?.classList.contains('text-ink-body'));
     clickFeedback();
     assert.deepEqual(messages[messages.length - 1], {
       type: 'office:openFailureFeedback', options: { from: 'failure_card', quote: { title, line: detail } },
