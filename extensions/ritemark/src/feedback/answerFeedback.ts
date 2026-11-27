@@ -36,25 +36,30 @@ export function decodeSidebarFeedbackOpen(raw: unknown): OpenAnswerFeedbackMessa
   return ref ? { from, kind, turn: ref, withAnswer, text } : null;
 }
 
-/** A continuation may change a previously completed turn back to working or failed. */
-export function findCompletedAnswer(
-  record: ConversationRecordV1,
-  turnId: string,
-): (AssistantMessageEventV1 & { runtimeId: AgentId }) | null {
+type CompletedAnswer = AssistantMessageEventV1 & { runtimeId: AgentId };
+
+function completedAnswers(record: ConversationRecordV1, onlyTurnId?: string): Map<string, CompletedAnswer | null> {
   const { lifecycle, events } = record;
-  if ((lifecycle.state === 'working' || lifecycle.state === 'needs-user') && lifecycle.activeTurnId === turnId) return null;
-  if (lifecycle.state === 'interrupted' && lifecycle.turnId === turnId) return null;
+  const answers = new Map<string, CompletedAnswer | null>();
+  if (lifecycle.state === 'working' || lifecycle.state === 'needs-user') answers.set(lifecycle.activeTurnId, null);
+  if (lifecycle.state === 'interrupted' && lifecycle.turnId) answers.set(lifecycle.turnId, null);
   for (let index = events.length - 1; index >= 0; index--) {
     const event = events[index];
-    if (event.turnId !== turnId) continue;
-    if (event.kind === 'boundary' && event.boundaryKind !== 'context-restored') return null;
-    if (event.kind === 'assistant-message') {
-      return event.terminalStatus === 'completed' && event.content.trim() && event.runtimeId !== 'legacy-ritemark'
-        ? { ...event, runtimeId: event.runtimeId }
-        : null;
-    }
+    const { turnId } = event;
+    if (onlyTurnId !== undefined && turnId !== onlyTurnId) continue;
+    if (event.kind !== 'assistant-message' && (event.kind !== 'boundary' || event.boundaryKind === 'context-restored')) continue;
+    // Older approved plans could record two terminal replies under one id.
+    // The id must identify a single visible answer.
+    answers.set(turnId, !answers.has(turnId) && event.kind === 'assistant-message'
+      && event.terminalStatus === 'completed' && event.content.trim() && event.runtimeId !== 'legacy-ritemark'
+      ? { ...event, runtimeId: event.runtimeId }
+      : null);
   }
-  return null;
+  return answers;
+}
+
+export function findCompletedAnswer(record: ConversationRecordV1, turnId: string): CompletedAnswer | null {
+  return completedAnswers(record, turnId).get(turnId) ?? null;
 }
 
 interface AnswerFeedbackDependencies {
@@ -73,11 +78,14 @@ export class AnswerFeedbackHost {
 
   async snapshot(conversationId: string): Promise<AnswerReactionsMessage | null> {
     if (!isConversationId(conversationId) || this.deps.activeConversation() !== conversationId) return null;
-    const reactions = this.deps.guidance.answerReactionsOf(conversationId);
-    if (!reactions.length) return { type: 'agent:answerReactions', conversationId, reactions };
     const record = await this.deps.readConversation(conversationId).catch(() => null);
-    if (!record || record.conversationId !== conversationId || this.deps.activeConversation() !== conversationId) return null;
-    return { type: 'agent:answerReactions', conversationId, reactions: this.deps.guidance.answerReactionsOf(conversationId) };
+    if (this.deps.activeConversation() !== conversationId) return null;
+    const eligibleTurnIds = record?.conversationId === conversationId
+      ? [...completedAnswers(record)].filter(([, answer]) => answer !== null).map(([turnId]) => turnId)
+      : [];
+    const eligible = new Set(eligibleTurnIds);
+    const reactions = this.deps.guidance.answerReactionsOf(conversationId).filter(mark => eligible.has(mark.turnId));
+    return { type: 'agent:answerReactions', conversationId, reactions, eligibleTurnIds };
   }
 
   async react(raw: unknown): Promise<AnswerReactionResult | null> {

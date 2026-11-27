@@ -177,6 +177,29 @@ test('feedback command validates the open and binds submissions to its card and 
   }
 
   const start = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!;
+  await t.test('thumb opens confirm a real sheet and decline when the answer or sheet is unavailable', async () => {
+    const options = { from: 'thumb', kind: 'ai-issue', turn, text: 'My words', withAnswer: true };
+    const opening = start(options);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(spec.lastAnswer?.quote, 'Chosen answer.');
+    const duplicate = await start(options);
+    dismiss('cancelled');
+    assert.equal(duplicate, false, 'the sheet already open did not take the second draft');
+    assert.equal(await opening, true, 'the sheet took the draft');
+    const shown = shows;
+    assert.equal(await start({ ...options, turn: { ...turn, turnId: 'missing' } }), false);
+    assert.equal(shows, shown, 'a vanished answer is not replaced with a different answer');
+    rejectSheet = true;
+    const priorInputBoxes = inputBoxes;
+    try {
+      assert.equal(await start(options), false);
+      assert.equal(inputBoxes, priorInputBoxes, 'a plain input box cannot take the answer');
+    } finally {
+      rejectSheet = false;
+    }
+  });
+
   await t.test('ignores a second open during the answer read and while the sheet is shown', async () => {
     const before = shows;
     const first = start({ from: 'help' });

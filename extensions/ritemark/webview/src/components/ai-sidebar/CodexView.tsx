@@ -19,7 +19,7 @@ import { AgentQuestion } from './AgentQuestion';
 import { PlanReviewCard } from './PlanReviewCard';
 import { RenderedMarkdown } from './RenderedMarkdown';
 import { StartingPoints } from './StartingPoints';
-import { extractPlanDisplayText } from './planText';
+import { codexPlanReplacesStreamingAnswer, extractPlanDisplayText } from './planText';
 import { ThemeChangeActions } from './ThemeChangeActions';
 import { TurnFailureCard } from './TurnFailureCard';
 import type { CodexConversationTurn, AgentProgress, CodexSidebarStatus } from './types';
@@ -164,9 +164,7 @@ export function CodexTurn({
     && ((turn.planSteps && turn.planSteps.length > 0) || displayPlanText)
   );
   const needsPlanReview = Boolean(showPlanCard && turn.result && !turn.result.error && turn.requiresPlanReview && !turn.planHandled);
-  const shouldHideStreamingBubble = Boolean(showPlanCard && displayPlanText)
-    && turn.streamingText.trim().length > 0
-    && rawPlanText.trim() === turn.streamingText.trim();
+  const shouldHideStreamingBubble = codexPlanReplacesStreamingAnswer(turn);
 
   // OpenCode reuses this Codex turn shape/rendering — label by provenance.
   const runtimeLabel = turn.runtime === 'opencode' ? 'OpenCode' : 'ChatGPT';

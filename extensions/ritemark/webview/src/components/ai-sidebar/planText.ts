@@ -1,3 +1,5 @@
+import type { CodexConversationTurn } from './types';
+
 /**
  * Plan text helpers for the plan-approval flow (Sprint 74, R1 / issue #86).
  *
@@ -9,6 +11,12 @@
 
 export function extractPlanDisplayText(planText: string): string {
   return planText.trim();
+}
+
+/** The plan card already renders this response, so there is no separate answer bubble. */
+export function codexPlanReplacesStreamingAnswer(turn: CodexConversationTurn): boolean {
+  const plan = extractPlanDisplayText(turn.planText || ((turn.result && !turn.result.error) ? turn.streamingText : ''));
+  return Boolean(turn.requestedPlanMode && plan && plan === turn.streamingText.trim());
 }
 
 /**

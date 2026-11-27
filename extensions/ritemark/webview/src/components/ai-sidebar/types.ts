@@ -1,4 +1,4 @@
-import type { AnswerFeedbackResult, AnswerReactionResult, AnswerReactionsMessage } from '../../../../src/feedback/answerFeedbackProtocol';
+import type { AnswerFeedbackResult, AnswerReactionResult, AnswerReactionsMessage, OpenAnswerFeedbackResult } from '../../../../src/feedback/answerFeedbackProtocol';
 /**
  * AI Sidebar Types
  *
@@ -502,6 +502,7 @@ export interface ConversationScopedMessage {
 export type ExtensionMessage =
   | AgentSidebarProtocolMessage
   | AnswerFeedbackResult
+  | OpenAnswerFeedbackResult
   | AnswerReactionResult
   | AnswerReactionsMessage
   | { type: 'ai-key-status'; hasKey: boolean }

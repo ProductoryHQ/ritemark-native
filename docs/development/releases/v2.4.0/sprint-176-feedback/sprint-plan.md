@@ -58,3 +58,6 @@ Growth owns the website and community half of #1045, including Discussions setup
 
 - [x] Approved by the Development manager, 25 November, with decisions 2 and the window-capture fallback settled.
 - Implementation starts on `sprint-176-feedback` branches; the visible PRs wait for the Experience lead's frames (27 November), and PR 1 (saved days) can start before them.
+
+
+PR 3 records the answer and failure feedback changes in the unreleased changelog. The v2.4.0 release notes are drafted with the release.

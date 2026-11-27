@@ -98,6 +98,53 @@ test('only the active conversation, fixed marks and the latest state of a comple
   assert.equal(guidance.read().positiveReaction, undefined);
 });
 
+test('snapshots advertise only unambiguous completed answers, including before the first mark', async () => {
+  const legacy = { ...answer('legacy', 2, 'completed'), runtimeId: 'legacy-ritemark' as const };
+  const { host } = harness(true, record([
+    answer('plan', 1, 'completed'),
+    legacy,
+    answer('plan', 3, 'completed'),
+    { eventId: '4', turnId: 'old-execution', sequence: 4, occurredAt: now, runtimeId: 'codex', kind: 'boundary', boundaryKind: 'failed', message: 'Empty plan reply' },
+    answer('old-execution', 5, 'completed'),
+    { eventId: '6', turnId: 'fresh', sequence: 6, occurredAt: now, runtimeId: 'codex', kind: 'attention', attentionKind: 'plan-review', attentionState: 'pending', prompt: 'Execution progress', summary: null },
+    answer('fresh', 7, 'completed'),
+    answer('working', 8, 'completed'),
+  ], { state: 'working', activeTurnId: 'working' }));
+  assert.deepEqual(await host.snapshot(conversationId), {
+    type: 'agent:answerReactions', conversationId, reactions: [], eligibleTurnIds: ['fresh'],
+  });
+  for (const turnId of ['legacy', 'plan', 'old-execution', 'working']) {
+    assert.equal((await press(host, 'up', { conversationId, turnId }))?.accepted, false);
+  }
+  assert.equal((await host.activeAnswer({ conversationId, turnId: 'fresh' }))?.content, 'Answer for fresh');
+});
+
+test('stored marks keep the 500 newest globally and drop deleted chats', async () => {
+  const { guidance } = harness(false);
+  await guidance.changeAnswerReaction(ref, 'up');
+  for (let index = 0; index < 499; index++) {
+    await guidance.changeAnswerReaction({ conversationId: otherConversation, turnId: String(index) }, 'down');
+  }
+  await guidance.changeAnswerReaction({ ...ref, turnId: 'newest' }, 'up');
+  assert.deepEqual(guidance.answerReactionsOf(conversationId).map(mark => mark.turnId), ['newest']);
+  assert.equal(guidance.answerReactionsOf(otherConversation).length, 499);
+  await guidance.dropAnswerReactions(otherConversation);
+  assert.deepEqual(guidance.answerReactionsOf(otherConversation), []);
+  assert.equal(guidance.answerReactionsOf(conversationId).length, 1);
+});
+
+test('marks from the grouped store migrate without changing their delivery state', async () => {
+  const oldState = {
+    v: 1, projects: {}, savedDays: [],
+    answerReactions: { [conversationId]: [{ turnId: ref.turnId, reaction: 'down', sent: true }] },
+  };
+  const guidance = new GuidanceStore({
+    get: <T>(key: string) => key === GUIDANCE_KEY ? oldState as T : undefined,
+    update: async () => {},
+  }, '2.4.0');
+  assert.deepEqual(guidance.answerReactionsOf(conversationId), [{ turnId: ref.turnId, reaction: 'down', sent: true }]);
+});
+
 test('reaction and Take back are one local transition apiece; analytics uses that turn’s runtime', async () => {
   const { host, guidance, events } = harness(true);
   const simultaneous = await Promise.all([press(host, 'up'), press(host, 'up'), press(host, 'down')]);

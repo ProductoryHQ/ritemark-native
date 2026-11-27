@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { createWindow } from '@mixmark-io/domino';
 import * as React from 'react';
@@ -21,6 +22,8 @@ const { createRoot } = await import('react-dom/client');
 const { flushSync } = await import('react-dom');
 const { RuntimeNotice } = await import('./RuntimeNotice');
 const { TurnFailureCard } = await import('./TurnFailureCard');
+const { useAISidebarStore } = await import('./store');
+const { createConversationState } = await import('./conversationState');
 
 const container = document.getElementById('root')!;
 const root = createRoot(container);
@@ -68,7 +71,7 @@ test('fallback failure links after the line and sends its visible words', () => 
   render(React.createElement(TurnFailureCard, {
     runtimeId: 'codex', error: 'Send your message again.', isLatest: true,
   }));
-  assert.match(container.textContent ?? '', /Send your message again\.\s*Tell us about this/);
+  assert.match(container.textContent ?? '', /^Send your message again\.\s*Tell us about this$/);
   openFeedback();
   assert.deepEqual(messages, expected({ title: 'ChatGPT couldn’t answer.', line: 'Send your message again.' }));
 });
@@ -96,4 +99,23 @@ test('successful notices have no failure link', () => {
   assert.ok(!container.textContent?.includes('Tell us about this'));
 });
 
+test('the model switched success card has no failure link', () => {
+  useAISidebarStore.setState({
+    activeConversationId: 'switched',
+    conversations: { switched: createConversationState('switched', { selectedModel: 'fallback' }) },
+    defaultClaudeModel: 'fallback',
+  });
+  render(React.createElement(TurnFailureCard, {
+    runtimeId: 'claude-code', error: 'Model unavailable', errorKind: 'model',
+    errorDetail: { model: 'unavailable' }, isLatest: true,
+  }));
+  assert.match(container.textContent ?? '', /Now using fallback/);
+  assert.doesNotMatch(container.textContent ?? '', /Tell us about this/);
+});
+
 test.after(() => root.unmount());
+
+test('the extension test script includes the failure feedback suite', () => {
+  const { scripts } = JSON.parse(readFileSync(new URL('../../../../package.json', import.meta.url), 'utf8'));
+  assert.match(scripts.test, /npx tsx webview\/src\/components\/ai-sidebar\/answerFeedback\.test\.ts && npx tsx webview\/src\/components\/ai-sidebar\/failureFeedback\.test\.ts/);
+});

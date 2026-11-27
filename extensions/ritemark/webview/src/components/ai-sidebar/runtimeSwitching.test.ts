@@ -700,6 +700,41 @@ function testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes() {
   }
 }
 
+function testApprovedPlanExecutesWithItsOwnTurnId() {
+  const posted: unknown[] = [];
+  const originalPost = vscode.postMessage;
+  vscode.postMessage = (message) => { posted.push(message); };
+  try {
+    const id = seedActiveConversation({
+      codexConversation: [makeCodexTurn({
+        id: 'plan-turn', requestedPlanMode: true, requiresPlanReview: true,
+        streamingText: 'Review the draft.', result: { status: 'success' },
+      })],
+    });
+    useAISidebarStore.getState().approveCodexPlan('plan-turn');
+    const [plan, execution] = selectActiveConversation(useAISidebarStore.getState()).codexConversation;
+    assert.equal(plan.id, 'plan-turn');
+    assert.equal(plan.streamingText, 'Review the draft.');
+    assert.equal(plan.planDecision, 'approved');
+    assert.notEqual(execution.id, plan.id);
+    const request = posted.find((message) => (message as { type: string }).type === 'agent-execute') as
+      | { conversationId: string; conversationTurnId: string; approvedPlanTurnId: string; prompt: string;
+          displayPrompt: string; conversationContinuation: boolean; planFirst: boolean }
+      | undefined;
+    assert.ok(request);
+    assert.equal(request.conversationId, id);
+    assert.equal(request.approvedPlanTurnId, plan.id);
+    assert.equal(request.conversationTurnId, execution.id);
+    assert.equal(request.displayPrompt, execution.userPrompt);
+    assert.equal(request.conversationContinuation, true);
+    assert.equal(request.planFirst, false);
+    assert.match(request.prompt, /Approved plan:\nReview the draft\./);
+  } finally {
+    vscode.postMessage = originalPost;
+    resetStore();
+  }
+}
+
 function main() {
   testSetPendingRuntimeMergesPartialUpdate();
   testSetPendingRuntimeModeOnly();
@@ -719,6 +754,7 @@ function main() {
   testALaterBootstrapKeepsTheThreadsOwnClaudeModel();
   testACatalogFallbackMovesEveryComposerSurfaceTogether();
   testANewCodexDefaultStartsFreshThreadsAndKeepsOpenOnes();
+  testApprovedPlanExecutesWithItsOwnTurnId();
   console.log('Runtime switching tests passed.');
 }
 

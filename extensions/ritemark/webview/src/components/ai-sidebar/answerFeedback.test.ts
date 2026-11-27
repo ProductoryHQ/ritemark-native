@@ -47,6 +47,7 @@ const conversation = createConversationState('chat', {
     { ...turn('opencode-done', 6), runtime: 'opencode', streamingText: 'OpenCode answer', result: done },
   ],
 });
+const eligibleTurnIds = ['claude-done', 'codex-done', 'opencode-done'];
 const otherChat = createConversationState('other', {
   agentConversation: [conversation.agentConversation[0]],
 });
@@ -75,10 +76,12 @@ const reply = (message: Parameters<ReturnType<typeof useAISidebarStore.getState>
 
 test.beforeEach(() => {
   flushSync(() => {
-    answerFeedbackStore.setState({ entries: {} });
+    answerFeedbackStore.setState({ entries: {}, eligibleTurns: {} });
     useAISidebarStore.setState({ conversations: { chat: conversation, other: otherChat }, activeConversationId: 'chat', promptQueues: {} });
     root.render(React.createElement(UnifiedConversationView));
   });
+  reply({ type: 'agent:answerReactions', conversationId: 'chat', eligibleTurnIds, reactions: [] });
+  reply({ type: 'agent:answerReactions', conversationId: 'other', eligibleTurnIds: ['claude-done'], reactions: [] });
   messages.length = 0;
   activeElement = null;
 });
@@ -169,6 +172,46 @@ test('a new message and a chat switch dismiss the unsent draft', () => {
   assert.ok(!form());
 });
 
+test('Escape closes an open menu before dismissing the answer feedback line', () => {
+  click(button(doneRow(), 'Not right'));
+  const layer = document.createElement('div');
+  const menu = document.createElement('div');
+  layer.setAttribute('data-radix-popper-content-wrapper', '');
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('data-state', 'open');
+  layer.appendChild(menu);
+  document.body.appendChild(layer);
+  menu.addEventListener('keydown', (event) => {
+    event.preventDefault();
+    // Radix closes the layer for this key. Keep its target attached until bubbling finishes.
+    menu.setAttribute('data-state', 'closed');
+  });
+  try {
+    dispatch(menu, 'keydown', 'Escape');
+    assert.equal(menu.getAttribute('data-state'), 'closed');
+    assert.ok(form());
+    dispatch(form()!.querySelector('textarea')!, 'keydown', 'Escape');
+    assert.ok(!form());
+  } finally {
+    layer.remove();
+  }
+});
+
+test('the feedback line uses the shared textarea focus styling and preserves its two-line growth', () => {
+  click(button(doneRow(), 'Not right'));
+  const input = form()?.querySelector('textarea');
+  assert.ok(form()?.classList.contains('w-[312px]'));
+  assert.equal(input?.rows, 2);
+  for (const name of ['focus:ring-[var(--vscode-focusBorder)]', 'text-[13px]', 'leading-5', '[field-sizing:content]']) {
+    assert.ok(input?.classList.contains(name), name);
+  }
+});
+
+test('the thumb tooltips use the top side in every reaction state', () => {
+  const source = readFileSync(new URL('./AnswerFeedback.tsx', import.meta.url), 'utf8');
+  assert.match(source, /<Tooltip key=\{thumb\} label=\{label\} side="top" asChild>/);
+});
+
 test('a queued follow-up dismisses an older draft before the queued turn starts', () => {
   const older = { conversationId: 'chat', turnId: 'claude-done' };
   click(button(turnContainer(older.turnId), 'Not right'));
@@ -194,8 +237,41 @@ test('failed Send keeps the words and Add this answer opens the sheet for the se
   assert.equal(form()?.querySelector('textarea')?.value, ' A correction ');
   assert.match(form()?.textContent ?? '', /It didn't go/);
   click(button(form(), 'Add this answer…'));
-  assert.deepEqual(messages.pop(), { type: 'agent:openFeedback', options: { from: 'thumb', kind: 'ai-issue', turn: older, withAnswer: true, text: ' A correction ' } });
+  assert.ok(form(), 'keep the line open while the host is opening the sheet');
+  assert.equal(button(form(), 'Add this answer…')?.getAttribute('aria-disabled'), 'true');
+  assert.ok(button(form(), 'Send')?.disabled);
+  const request = messages.pop() as { requestId: number };
+  assert.equal(typeof request.requestId, 'number');
+  const options = { from: 'thumb', kind: 'ai-issue', turn: older, withAnswer: true, text: ' A correction ' };
+  assert.deepEqual(request, { type: 'agent:openFeedback', requestId: request.requestId, options });
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId + 1, ok: true });
+  assert.ok(form(), 'ignore unrelated sheet confirmations');
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: false });
+  assert.equal(form()?.querySelector('textarea')?.value, ' A correction ');
+  assert.match(form()?.textContent ?? '', /It didn't go/);
+  click(button(form(), 'Add this answer…'));
+  const retry = messages.pop() as { requestId: number };
+  assert.deepEqual(retry, { type: 'agent:openFeedback', requestId: retry.requestId, options });
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: true });
+  assert.ok(form(), 'ignore a stale confirmation after retrying');
+  reply({ type: 'agent:openFeedbackResult', requestId: retry.requestId, ok: true });
   assert.ok(!form());
+});
+
+test('a confirmed sheet opening clears the handed-off words before the line opens again', () => {
+  const older = { conversationId: 'chat', turnId: 'claude-done' };
+  click(button(turnContainer(older.turnId), 'Not right'));
+  flushSync(() => answerFeedbackStore.getState().edit(older, 'A correction'));
+  click(button(form(), 'Add this answer…'));
+  const request = messages.pop() as { requestId: number };
+  reply({ type: 'agent:openFeedbackResult', requestId: request.requestId, ok: true });
+  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'down', accepted: true, sent: false });
+  click(button(turnContainer(older.turnId), 'Take back'));
+  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'none', accepted: true, sent: false });
+  click(button(turnContainer(older.turnId), 'Good answer'));
+  reply({ type: 'agent:answerReactionResult', ...older, reaction: 'up', accepted: true, sent: false });
+  click(button(turnContainer(older.turnId), 'Tell us more'));
+  assert.equal(form()?.querySelector('textarea')?.value, '');
 });
 
 test('a delivered message closes the draft and shows thanks even when the mark was never sent', () => {
@@ -213,11 +289,49 @@ test('a delivered message closes the draft and shows thanks even when the mark w
 });
 
 test('restored marks are scoped to the conversation and an empty snapshot clears them', () => {
-  reply({ type: 'agent:answerReactions', conversationId: 'chat', reactions: [{ turnId: target.turnId, reaction: 'up', sent: true }] });
+  reply({ type: 'agent:answerReactions', conversationId: 'chat', eligibleTurnIds, reactions: [{ turnId: target.turnId, reaction: 'up', sent: true }] });
   assert.ok(button(doneRow(), 'Take back'));
   assert.match(doneRow()?.textContent ?? '', /Thanks\./);
-  reply({ type: 'agent:answerReactions', conversationId: 'other', reactions: [] });
+  reply({ type: 'agent:answerReactions', conversationId: 'other', eligibleTurnIds: [], reactions: [] });
   assert.ok(button(doneRow(), 'Take back'));
-  reply({ type: 'agent:answerReactions', conversationId: 'chat', reactions: [] });
+  reply({ type: 'agent:answerReactions', conversationId: 'chat', eligibleTurnIds, reactions: [] });
   assert.ok(button(doneRow(), 'Good answer'));
+});
+
+test('a migrated answer still renders without thumbs when the host excludes its turn', () => {
+  assert.match(turnContainer('claude-done')?.textContent ?? '', /Claude answer/);
+  reply({
+    type: 'agent:answerReactions', conversationId: 'chat',
+    eligibleTurnIds: ['codex-done', 'opencode-done'], reactions: [],
+  });
+  assert.ok(!button(turnContainer('claude-done'), 'Good answer'));
+  assert.ok(!button(turnContainer('claude-done'), 'Not right'));
+  assert.ok(button(doneRow(), 'Good answer'));
+});
+
+test('a structured plan with no visible answer bubble does not offer feedback for the hidden text', () => {
+  const plan = {
+    ...conversation.codexConversation[0],
+    id: 'approved-plan', requestedPlanMode: true, requiresPlanReview: true,
+    planHandled: true, planDecision: 'approved' as const,
+    streamingText: 'Raw plan response', planText: 'Raw plan response',
+    planSteps: [{ step: 'Review the draft', status: 'completed' as const }],
+  };
+  flushSync(() => useAISidebarStore.setState({
+    conversations: { chat: { ...conversation, codexConversation: [plan, ...conversation.codexConversation] }, other: otherChat },
+  }));
+  reply({ type: 'agent:answerReactions', conversationId: 'chat', eligibleTurnIds: [...eligibleTurnIds, plan.id], reactions: [] });
+  assert.match(turnContainer(plan.id)?.textContent ?? '', /Review the draft/);
+  assert.doesNotMatch(turnContainer(plan.id)?.textContent ?? '', /Raw plan response/);
+  assert.ok(!button(turnContainer(plan.id), 'Good answer'));
+});
+
+test('a refused thumb restores the unmarked controls without a message', () => {
+  click(button(doneRow(), 'Good answer'));
+  assert.ok(button(doneRow(), 'Take back'));
+  reply({ type: 'agent:answerReactionResult', ...target, reaction: 'up', accepted: false, sent: false });
+  assert.ok(button(doneRow(), 'Good answer'));
+  assert.ok(button(doneRow(), 'Not right'));
+  assert.ok(!button(doneRow(), 'Take back'));
+  assert.doesNotMatch(doneRow()?.textContent ?? '', /Thanks|It didn't go/);
 });

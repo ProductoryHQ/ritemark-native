@@ -13,7 +13,7 @@ import { AgentTurnBlock } from './AgentView';
 import { CodexTurn, CompatibilityNotice, getCompatibilityNotice } from './CodexView';
 import { ActivityStatusLine } from './ActivityStatusLine';
 import { AnswerFeedbackControls, AnswerFeedbackForm } from './AnswerFeedback';
-import { feedbackDraftIsOpen, isCompletedAnswer, type OpenFeedbackDraft } from './answerFeedbackState';
+import { answerFeedbackStore, feedbackDraftIsOpen, isCompletedAnswer, type OpenFeedbackDraft } from './answerFeedbackState';
 import { deriveActivityState } from './activityState';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
 import type {
@@ -124,13 +124,16 @@ export function UnifiedConversationView() {
   const closeFeedbackDraft = useCallback(() => setOpenFeedbackDraft(null), []);
   useLayoutEffect(closeFeedbackDraft, [closeFeedbackDraft, feedbackScope.conversationId, feedbackScope.latestTurnId, latestQueuedId]);
 
-  const latestWithFeedback = lastMerged && isCompletedAnswer(lastMerged.turn)
+  const eligibleTurns = answerFeedbackStore((state) => state.eligibleTurns[activeConversation.id]);
+  const hasFeedback = (turn: AgentConversationTurn | CodexConversationTurn) =>
+    eligibleTurns?.has(turn.id) && isCompletedAnswer(turn);
+  const latestWithFeedback = lastMerged && hasFeedback(lastMerged.turn)
     && deriveActivityState(activeConversation) === 'done'
     ? lastMerged.turn.id : undefined;
   const feedbackControls = (turnId: string) => (
     <AnswerFeedbackControls
       target={{ conversationId: activeConversation.id, turnId }}
-      openForm={() => setOpenFeedbackDraft({ ...feedbackScope, turnId })}
+      openForm={(trigger) => setOpenFeedbackDraft({ ...feedbackScope, turnId, trigger })}
       closeForm={closeFeedbackDraft}
     />
   );
@@ -139,6 +142,7 @@ export function UnifiedConversationView() {
       key={`${activeConversation.id}:${turnId}`}
       target={{ conversationId: activeConversation.id, turnId }}
       close={closeFeedbackDraft}
+      trigger={openFeedbackDraft?.trigger}
     />
   );
   const lastAgentTurn = lastMerged?.runtime === 'claude' ? lastMerged.turn : undefined;
@@ -225,7 +229,7 @@ export function UnifiedConversationView() {
 
         {merged.map((item, index) => {
           const boundaries = transcriptBoundaries.filter((boundary) => boundary.turnId === item.turn.id);
-          const olderAnswer = index !== merged.length - 1 && isCompletedAnswer(item.turn);
+          const olderAnswer = index !== merged.length - 1 && hasFeedback(item.turn);
           const draftOpen = feedbackDraftIsOpen(openFeedbackDraft, feedbackScope, item.turn.id);
           const showLiveNotice = continuationNotice
             && (continuationNotice.turnId === item.turn.id

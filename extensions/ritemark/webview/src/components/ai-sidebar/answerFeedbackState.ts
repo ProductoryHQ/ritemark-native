@@ -2,13 +2,14 @@ import { create } from 'zustand';
 import { vscode } from '../../lib/vscode';
 import type {
   AnswerFeedbackResult, AnswerFeedbackTarget, AnswerReaction, AnswerReactionMessage, AnswerReactionResult,
-  AnswerReactionsMessage, OpenAnswerFeedbackMessage, SendAnswerFeedbackMessage,
+  AnswerReactionsMessage, OpenAnswerFeedbackMessage, OpenAnswerFeedbackResult, SendAnswerFeedbackMessage,
 } from '../../../../src/feedback/answerFeedbackProtocol';
 import type { AgentConversationTurn, CodexConversationTurn } from './types';
+import { codexPlanReplacesStreamingAnswer } from './planText';
 
 export type AnswerTarget = AnswerFeedbackTarget;
 type DraftScope = { conversationId: string; latestTurnId: string | undefined; latestQueuedId: string | undefined };
-export type OpenFeedbackDraft = AnswerTarget & DraftScope;
+export type OpenFeedbackDraft = AnswerTarget & DraftScope & { trigger: () => HTMLButtonElement | null };
 
 export function feedbackDraftIsOpen(draft: OpenFeedbackDraft | null, scope: DraftScope, turnId: string): boolean {
   return draft !== null && draft.conversationId === scope.conversationId
@@ -20,7 +21,8 @@ export function isCompletedAnswer(turn: AgentConversationTurn | CodexConversatio
   if ('streamingText' in turn) {
     return (turn.result?.status === 'success' || turn.result?.status === 'completed')
       && (!turn.requiresPlanReview || turn.planHandled === true)
-      && turn.streamingText.trim().length > 0;
+      && turn.streamingText.trim().length > 0
+      && !(turn.planSteps?.length && codexPlanReplacesStreamingAnswer(turn));
   }
   return !turn.result.stopped && !turn.pendingPlanApproval && turn.result.text.trim().length > 0;
 }
@@ -31,6 +33,7 @@ interface FeedbackEntry {
   markSent: boolean;
   text: string;
   sending: boolean;
+  openingSheet?: number;
   failed: boolean;
   wordsSent: boolean;
 }
@@ -39,6 +42,7 @@ const EMPTY: FeedbackEntry = { reaction: 'none', markSent: false, text: '', send
 export const feedbackEntry = (state: FeedbackState, { conversationId, turnId }: AnswerTarget) => state.entries[conversationId]?.[turnId] ?? EMPTY;
 
 interface FeedbackState {
+  eligibleTurns: Record<string, ReadonlySet<string>>;
   entries: Record<string, Record<string, FeedbackEntry>>;
   react(target: AnswerTarget, reaction: AnswerReaction): boolean;
   finishReaction(message: AnswerReactionResult): void;
@@ -47,9 +51,12 @@ interface FeedbackState {
   send(target: AnswerTarget): boolean;
   finishSend(message: AnswerFeedbackResult): void;
   openWithAnswer(target: AnswerTarget): void;
+  finishOpen(message: OpenAnswerFeedbackResult): void;
 }
 
 export const answerFeedbackStore = create<FeedbackState>((set, get) => {
+  let nextOpenRequestId = 0;
+  const pendingOpens = new Map<number, AnswerTarget>();
   const patch = (target: AnswerTarget, update: Partial<FeedbackEntry>) => {
     const { conversationId, turnId } = target;
     set((state) => ({
@@ -61,6 +68,7 @@ export const answerFeedbackStore = create<FeedbackState>((set, get) => {
   };
   return {
     entries: {},
+    eligibleTurns: {},
     react(target, reaction) {
       const entry = feedbackEntry(get(), target);
       if (entry.pendingReaction !== undefined || entry.reaction === reaction) return false;
@@ -76,7 +84,7 @@ export const answerFeedbackStore = create<FeedbackState>((set, get) => {
         ...(message.accepted ? { reaction: message.reaction, markSent: message.sent } : {}),
       });
     },
-    restoreReactions({ conversationId, reactions }) {
+    restoreReactions({ conversationId, reactions, eligibleTurnIds }) {
       const entries = { ...get().entries[conversationId] };
       const marks = new Map(reactions.map((mark) => [mark.turnId, mark]));
       for (const turnId of new Set([...Object.keys(entries), ...marks.keys()])) {
@@ -85,15 +93,18 @@ export const answerFeedbackStore = create<FeedbackState>((set, get) => {
         const mark = marks.get(turnId);
         entries[turnId] = { ...entry, reaction: mark?.reaction ?? 'none', markSent: mark?.sent ?? false };
       }
-      set((state) => ({ entries: { ...state.entries, [conversationId]: entries } }));
+      set((state) => ({
+        entries: { ...state.entries, [conversationId]: entries },
+        eligibleTurns: { ...state.eligibleTurns, [conversationId]: new Set(eligibleTurnIds) },
+      }));
     },
     edit(target, text) {
       patch(target, { text, failed: false });
     },
     send(target) {
-      const { sending, text } = feedbackEntry(get(), target);
+      const { sending, openingSheet, text } = feedbackEntry(get(), target);
       const trimmed = text.trim();
-      if (sending || !trimmed) return false;
+      if (sending || openingSheet !== undefined || !trimmed) return false;
       patch(target, { sending: true, failed: false });
       const message: SendAnswerFeedbackMessage = { type: 'agent:sendAnswerFeedback', ...target, text: trimmed };
       vscode.postMessage(message);
@@ -108,11 +119,24 @@ export const answerFeedbackStore = create<FeedbackState>((set, get) => {
       });
     },
     openWithAnswer(target) {
+      const { text, sending, openingSheet } = feedbackEntry(get(), target);
+      if (sending || openingSheet !== undefined) return;
+      const requestId = ++nextOpenRequestId;
+      pendingOpens.set(requestId, target);
+      patch(target, { openingSheet: requestId, failed: false });
       const message: OpenAnswerFeedbackMessage = {
         type: 'agent:openFeedback',
-        options: { from: 'thumb', kind: 'ai-issue', turn: target, withAnswer: true, text: feedbackEntry(get(), target).text },
+        requestId,
+        options: { from: 'thumb', kind: 'ai-issue', turn: target, withAnswer: true, text },
       };
       vscode.postMessage(message);
+    },
+    finishOpen({ requestId, ok }) {
+      const target = pendingOpens.get(requestId);
+      if (!target) return;
+      pendingOpens.delete(requestId);
+      if (feedbackEntry(get(), target).openingSheet !== requestId) return;
+      patch(target, { openingSheet: undefined, failed: !ok, ...(ok ? { text: '' } : {}) });
     },
   };
 });

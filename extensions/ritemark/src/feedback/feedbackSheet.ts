@@ -173,8 +173,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
   let open: OpenSheet | null = null;
 
   let opening = false;
-  const openSheet = async (raw?: unknown): Promise<void> => {
-    if (opening) return;
+  const openSheet = async (raw?: unknown): Promise<boolean> => {
+    if (opening) return false;
     opening = true;
     try {
       const options = decodeOpen(raw);
@@ -184,6 +184,8 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       const last = await (options.turn ? deps.answerOfTurn(options.turn)
         : contextual ? Promise.resolve(null) : deps.lastAnswer()).catch(() => null);
       const answer = last ? answerForSheet(reportContext, last.text) : null;
+      const addAnswer = options.from === 'thumb' && options.withAnswer;
+      if (addAnswer && !answer) return false;
       const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
       const includeAnswer = Boolean(options.withAnswer && options.turn && answer);
@@ -205,19 +207,22 @@ export function registerFeedback(context: vscode.ExtensionContext, deps: Feedbac
       try {
         result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
       } catch {
+        if (addAnswer) return false; // The fallback input box cannot take the answer.
         // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
         if (spec.aiIssue && !contextual) {
           await deps.openReportWindow();
-          return;
+          return false;
         }
         const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, value: options.text, ignoreFocusOut: true });
-        if (!text?.trim()) return;
+        if (!text?.trim()) return false;
         const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), from: sentFrom(options.from) } }]);
         if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
         else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
-        return;
+        return false;
       }
       if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
+      // The existing workbench command reports the outcome when the sheet closes.
+      return result === 'sent' || result === 'mailed' || result === 'cancelled';
     } finally {
       open = null;
       opening = false;

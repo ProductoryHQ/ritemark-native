@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { FEEDBACK_COPY } from '../../../../src/feedback/feedbackCopy';
+import { focusTrigger, useDismissOnOutside } from '../../lib/dismissOnOutside';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/Icon';
+import { Textarea } from '../ui/textarea';
 import { Tooltip } from '../ui/tooltip';
 import { ANSWER_FEEDBACK_COPY as copy } from './answerFeedbackCopy';
 import { FeedbackLink } from './FeedbackLink';
@@ -10,21 +12,24 @@ import { answerFeedbackStore, feedbackEntry, type AnswerTarget } from './answerF
 export function AnswerFeedbackControls({
   target, openForm, closeForm,
 }: {
-  target: AnswerTarget; openForm(): void; closeForm(): void;
+  target: AnswerTarget; openForm(trigger: () => HTMLButtonElement | null): void; closeForm(): void;
 }) {
   const { reaction, pendingReaction, markSent, wordsSent } = answerFeedbackStore((state) => feedbackEntry(state, target));
   const mark = pendingReaction ?? reaction;
+  const up = useRef<HTMLButtonElement>(null);
+  const down = useRef<HTMLButtonElement>(null);
   return (
     <div data-answer-feedback-controls className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] text-ink-muted">
       {(wordsSent || (mark === 'up' && reaction === 'up' && markSent)) && <span role="status">{copy.thanks}</span>}
-      {mark === 'up' && !wordsSent && <FeedbackLink onClick={openForm}>{copy.tellUsMore}</FeedbackLink>}
+      {mark === 'up' && !wordsSent && <FeedbackLink onClick={() => openForm(() => up.current)}>{copy.tellUsMore}</FeedbackLink>}
       {(['up', 'down'] as const).map((thumb) => {
         if (mark !== 'none' && mark !== thumb) return null;
         const pressed = mark === thumb;
         const label = pressed ? copy.takeBack : thumb === 'up' ? copy.goodAnswer : copy.notRight;
         return (
-          <Tooltip key={thumb} label={label} asChild>
+          <Tooltip key={thumb} label={label} side="top" asChild>
             <Button
+              ref={thumb === 'up' ? up : down}
               type="button"
               variant="ghost"
               size="icon-sm"
@@ -35,7 +40,7 @@ export function AnswerFeedbackControls({
               onClick={() => {
                 if (!answerFeedbackStore.getState().react(target, pressed ? 'none' : thumb)) return;
                 if (pressed) closeForm();
-                else if (thumb === 'down') openForm();
+                else if (thumb === 'down') openForm(() => down.current);
               }}
             >
               <Icon name={thumb === 'up' ? 'thumbs-up' : 'thumbs-down'} size={14} className="size-3.5" tone="inherit" weight={pressed ? 'fill' : 'regular'} />
@@ -47,50 +52,33 @@ export function AnswerFeedbackControls({
   );
 }
 
-export function AnswerFeedbackForm({ target, close }: { target: AnswerTarget; close(): void }) {
-  const { text, sending, failed } = answerFeedbackStore((state) => feedbackEntry(state, target));
+export function AnswerFeedbackForm({ target, close, trigger }: {
+  target: AnswerTarget; close(): void; trigger?: () => HTMLButtonElement | null;
+}) {
+  const { text, sending, failed, openingSheet } = answerFeedbackStore((state) => feedbackEntry(state, target));
   const form = useRef<HTMLFormElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const { conversationId, turnId } = target;
   const omitted = !text.trim();
-  const send = <Button type="submit" size="sm" disabled={sending || omitted}>{copy.send}</Button>;
+  const busy = sending || openingSheet !== undefined;
+  const send = <Button type="submit" size="sm" disabled={busy || omitted}>{copy.send}</Button>;
+  useDismissOnOutside(form, close, { trigger });
 
   useEffect(() => {
-    const trigger = document.activeElement;
-    const restoreFocus = (sent = false) => {
-      if (!(trigger instanceof HTMLElement) || !form.current?.contains(document.activeElement)) return;
-      const thumb = sent && trigger.closest('[data-answer-feedback-controls]')
-        ?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
-      (thumb || trigger).focus({ preventScroll: true });
-    };
     input.current?.focus({ preventScroll: true });
     input.current?.scrollIntoView({ block: 'nearest' });
-    const onPointerDown = (event: PointerEvent) => {
-      if (!form.current?.contains(event.target as Node)) close();
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing) return;
-      event.preventDefault();
-      restoreFocus();
-      close();
-    };
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('keydown', onKeyDown, true);
-    const unsubscribe = answerFeedbackStore.subscribe((next, previous) => {
+    return answerFeedbackStore.subscribe((next, previous) => {
       const scopedTarget = { conversationId, turnId };
       const before = feedbackEntry(previous, scopedTarget);
       const after = feedbackEntry(next, scopedTarget);
-      if (before.sending && !after.sending && !after.failed) {
-        restoreFocus(true);
+      const sent = before.sending && !after.sending;
+      const opened = before.openingSheet !== undefined && after.openingSheet === undefined;
+      if (!after.failed && (sent || opened)) {
+        if (form.current?.contains(document.activeElement)) focusTrigger(trigger?.());
         close();
       }
     });
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown, true);
-      document.removeEventListener('keydown', onKeyDown, true);
-      unsubscribe();
-    };
-  }, [close, conversationId, turnId]);
+  }, [close, conversationId, turnId, trigger]);
 
   return (
     <form
@@ -101,24 +89,20 @@ export function AnswerFeedbackForm({ target, close }: { target: AnswerTarget; cl
         answerFeedbackStore.getState().send(target);
       }}
     >
-      <textarea
+      <Textarea
         ref={input}
         rows={2}
         maxLength={2000}
         aria-label={copy.placeholder}
         placeholder={copy.placeholder}
         value={text}
-        readOnly={sending}
+        readOnly={busy}
         onChange={(event) => answerFeedbackStore.getState().edit(target, event.currentTarget.value)}
-        className="block min-h-[52px] w-full resize-none rounded-md border border-hairline bg-surface px-2 py-1 text-[13px] leading-5 text-ink-body outline-none placeholder:text-ink-muted focus:border-[var(--r-focus-ring)] focus:ring-1 focus:ring-[var(--r-focus-ring)] [field-sizing:content]"
+        className="block min-h-[52px] resize-none rounded-md border-hairline bg-surface px-2 py-1 text-[13px] leading-5 text-ink-body placeholder:text-ink-muted [field-sizing:content]"
       />
       {failed && <p role="alert" className="mt-1 text-[12px] text-[var(--r-error)]">{FEEDBACK_COPY.card.failed}</p>}
       <div className="mt-2 flex items-center justify-between gap-2">
-        <FeedbackLink onClick={() => {
-          if (sending) return;
-          answerFeedbackStore.getState().openWithAnswer(target);
-          close();
-        }}>{copy.addAnswer}</FeedbackLink>
+        <FeedbackLink disabled={busy} onClick={() => answerFeedbackStore.getState().openWithAnswer(target)}>{copy.addAnswer}</FeedbackLink>
         {omitted ? <Tooltip label={copy.writeFirst}>{send}</Tooltip> : send}
       </div>
     </form>

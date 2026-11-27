@@ -148,7 +148,7 @@ export function TurnFailureCard({
       <div className="flex items-start gap-2 text-[var(--r-error)]" data-turn-failure={errorKind ?? 'unclassified'}>
         <Icon name="warning-circle" size={14} className="mt-0.5 shrink-0" />
         <span>
-          <span className="font-medium">{title}</span>{' '}{error}{' '}
+          {error}{' '}
           <FailureFeedbackLink title={title} line={error} />
         </span>
       </div>
@@ -159,7 +159,7 @@ export function TurnFailureCard({
   return (
     <div data-turn-failure={errorKind}>
       <RuntimeNotice
-        feedback
+        feedback={!card.done}
         title={card.title}
         message={card.message}
         tone={card.done ? 'success' : 'warning'}

@@ -2024,6 +2024,7 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       if (!prompt) {
         return;
       }
+      const execution = nextTurns[nextTurns.length - 1];
       patchConversation(conversation.id, (c) => ({
         codexConversation: nextTurns,
         // Sprint 103 D2: plan approval auto-resets the Plan chip.
@@ -2038,10 +2039,12 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
       vscode.postMessage({
         type: 'agent-execute',
         conversationId: conversation.id,
-        conversationTurnId: turnId,
+        conversationTurnId: execution.id,
         agentId: 'codex',
         prompt,
+        displayPrompt: execution.userPrompt,
         conversationContinuation: true,
+        approvedPlanTurnId: turnId,
         model: conversation.codexSelectedModel,
         approvalMode: policyOf(conversation.pendingRuntime).autonomy,
         planFirst: false,
@@ -2554,6 +2557,9 @@ export const useAISidebarStore = create<AISidebarState>((set, get) => {
           break;
         case 'agent:answerFeedbackResult':
           answerFeedbackStore.getState().finishSend(message);
+          break;
+        case 'agent:openFeedbackResult':
+          answerFeedbackStore.getState().finishOpen(message);
           break;
         case 'agent:answerReactions':
           answerFeedbackStore.getState().restoreReactions(message);

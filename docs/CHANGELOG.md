@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Give a thumbs-up or thumbs-down on supported AI answers, add written feedback, or report an AI failure from its card.
+
 - AI chat steps show which documents were read and explain when a document could not be opened (#996).
 - Finder can show a saved deck’s first slide on Mac, and pressing Space previews its slides.
 - Equations in Word stay as math when AI reads the document or you save a Markdown copy (#1011).

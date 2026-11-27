@@ -22,6 +22,7 @@ export interface AnswerReactionsMessage {
   type: 'agent:answerReactions';
   conversationId: string;
   reactions: StoredAnswerReaction[];
+  eligibleTurnIds: string[];
 }
 
 export interface SendAnswerFeedbackMessage extends AnswerFeedbackTarget {
@@ -36,9 +37,16 @@ export interface AnswerFeedbackResult extends AnswerFeedbackTarget {
 
 export interface OpenAnswerFeedbackMessage {
   type: 'agent:openFeedback';
+  requestId?: number;
   options:
     | { from: 'thumb'; kind: 'ai-issue'; turn: AnswerFeedbackTarget; withAnswer: true; text: string }
     | { from: 'failure_card'; quote?: { title: string; line: string } };
+}
+
+export interface OpenAnswerFeedbackResult {
+  type: 'agent:openFeedbackResult';
+  requestId: number;
+  ok: boolean;
 }
 
 export interface StoredAnswerReaction {
