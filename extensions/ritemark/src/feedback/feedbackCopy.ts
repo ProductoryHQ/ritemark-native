@@ -28,6 +28,7 @@ export const FEEDBACK_COPY = {
       lede: 'Tell us what the AI said or did that was wrong, unsafe or not what you asked for.',
       placeholder: 'What happened?',
     },
+    fromCard: 'From the card',
     aiBox: 'This is about something the AI said or did',
     answerBox: "I'd like an answer",
     answerNote: 'This opens your e-mail app instead, so we can write back to you. Ritemark never asks for your address.',
@@ -72,6 +73,7 @@ export const FEEDBACK_COPY = {
   },
   /** Each sheet button's hover hint, and why Send waits (QA, 26 October). */
   hints: {
+    leaveThisOut: 'Leave this out',
     cancel: 'Closes this without sending anything',
     send: 'Sends your words to the people who make Ritemark',
     openInEmail: 'Opens your e-mail app with this message, to send it yourself',

@@ -228,7 +228,9 @@ export class ConsentGate {
     let sent = true;
     try {
       for (const event of events) {
-        await client.captureImmediate({ distinctId, event: event.name, properties: { ...event.properties, ...shared, $process_person_profile: false, $geoip_disable: true } });
+        const { from, ...explicit } = event.properties;
+        const properties = yes && from !== undefined ? { ...explicit, from } : explicit;
+        await client.captureImmediate({ distinctId, event: event.name, properties: { ...properties, ...shared, $process_person_profile: false, $geoip_disable: true } });
       }
     } catch (error) {
       this.deps.log?.('Failed to send feedback', error);

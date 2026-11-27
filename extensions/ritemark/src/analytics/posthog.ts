@@ -21,6 +21,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { createHash, randomBytes } from 'crypto';
+import { CLAUDE_MODEL_IDS, CODEX_MODEL_IDS, GEMINI_MODEL_IDS, OPENAI_MODEL_IDS, OPENROUTER_MODEL_IDS } from '../ai/modelConfig';
+import { BUNDLED_CATALOG } from '../ai/modelCatalog/bundledCatalog';
 import { isEnabled } from '../features';
 import type { EventName, EventPayloads, TurnOutcome, VoiceSource } from './events';
 import { TurnCounter } from './turnCounts';
@@ -235,6 +237,24 @@ export async function trackEvent<T extends EventName>(
   properties: EventPayloads[T]
 ): Promise<boolean> {
   return gate ? gate.track(name, properties) : false;
+}
+
+const reactionModelIds = new Set<string>([
+  ...Object.values(CLAUDE_MODEL_IDS),
+  ...Object.values(CODEX_MODEL_IDS),
+  ...Object.values(GEMINI_MODEL_IDS),
+  ...Object.values(OPENAI_MODEL_IDS),
+  ...Object.values(OPENROUTER_MODEL_IDS),
+  ...(BUNDLED_CATALOG.providers.opencode?.models.map(model => model.id) ?? []),
+]);
+
+/** PR 3's thumbs and Take back use the ordinary consent-gated analytics path. */
+export function trackAnswerReaction(
+  reaction: EventPayloads['ai_answer_reacted']['reaction'],
+  ai: EventPayloads['ai_answer_reacted']['ai'],
+  model: string | null | undefined,
+): Promise<boolean> {
+  return trackEvent('ai_answer_reacted', { reaction, ai, model: model && reactionModelIds.has(model) ? model : 'other' });
 }
 
 /** The welcome's events: held in memory until the answer (R8). */

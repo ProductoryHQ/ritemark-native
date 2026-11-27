@@ -6,6 +6,9 @@
  */
 
 import assert from 'node:assert/strict';
+import Module from 'node:module';
+import { test } from 'node:test';
+import type { FeedbackSheetSpec } from './feedbackSheet';
 import { composeReport, LAST_ANSWER_LABEL, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { DELIVERY_CLAIM_WORDS } from '../reporting/reportCopy';
 import { buildMailtoUrl, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
@@ -86,3 +89,97 @@ assert.ok(buildMailtoUrl({ recipient: REPORT_RECIPIENT, subject: reportSubject(c
 assert.deepEqual(answerForSheet(context, 'A short answer.'), { text: 'A short answer.', shortened: false });
 
 console.log('feedback: all assertions passed');
+
+test('feedback command validates the open and binds submissions to its card and turn', async () => {
+  const handlers = new Map<string, (...args: any[]) => any>();
+  const events: unknown[] = [];
+  let spec: FeedbackSheetSpec;
+  let dismiss: () => void;
+  let mailBody: string | null = null;
+  const loader = Module as unknown as { _load(id: string, ...args: unknown[]): unknown };
+  const load = loader._load;
+  loader._load = function (id, ...args) {
+    if (id === 'vscode') return {
+      commands: {
+        registerCommand: (name: string, handler: (...args: any[]) => any) => handlers.set(name, handler),
+        executeCommand: (_name: string, opened: FeedbackSheetSpec) => {
+          spec = opened;
+          return new Promise<void>(resolve => { dismiss = resolve; });
+        },
+      },
+      env: { openExternal: async (uri: string) => { mailBody = new URL(uri).searchParams.get('body'); return true; } },
+      Uri: { parse: (uri: string) => uri },
+    };
+    if (id === '../analytics/posthog') return {
+      trackEvent: (name: string, properties: unknown) => events.push({ name, properties }),
+      sendFeedback: async (batch: unknown[]) => { events.push(...batch); return true; },
+    };
+    return load.call(this, id, ...args);
+  };
+  let feedback: typeof import('./feedbackSheet');
+  try {
+    feedback = require('./feedbackSheet');
+  } finally {
+    loader._load = load;
+  }
+  const turn = { conversationId: 'chat-elsewhere', turnId: 'chosen' };
+  feedback.registerFeedback({ subscriptions: [] } as never, {
+    appVersion: '2.4.0',
+    lastAnswer: async () => ({ title: 'Last chat', text: 'Last answer.' }),
+    answerOfTurn: async ref => ref.turnId === turn.turnId && ref.conversationId === turn.conversationId
+      ? { title: 'Chosen chat', text: 'Chosen answer.' } : null,
+    openReportWindow: async () => {},
+  });
+  async function open(options: unknown) {
+    const closed = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!(options);
+    await Promise.resolve();
+    await Promise.resolve();
+    return { spec, close: async () => { dismiss(); await closed; } };
+  }
+  const bad = await open({ from: 'unknown', quote: { title: 1, line: 'words' }, text: {}, turn: { conversationId: 'chat', turnId: ' ' } });
+  assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'command' } });
+  assert.equal(bad.spec.quote, undefined);
+  assert.equal(bad.spec.text, undefined);
+  assert.equal(bad.spec.lastAnswer?.quote, 'Last answer.');
+  await bad.close();
+  for (const line of ['', '  ', 'https://user:pass@example.com', '/Users/example', 'C:\\Example', '~/file', '~/', '/tmp/file']) {
+    const badQuote = await open({ quote: { title: 'Card', line } });
+    assert.equal(badQuote.spec.quote, undefined, line);
+    await badQuote.close();
+  }
+  const bounded = await open({ from: 'thumb', text: 'x'.repeat(2001), quote: { title: 'word '.repeat(40), line: 'abc '.repeat(150) } });
+  assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'thumb' } });
+  assert.deepEqual(bounded.spec.quote, { title: `${'word '.repeat(24).trimEnd()}…`, line: `${'abc '.repeat(125).trimEnd()}…` });
+  assert.equal(bounded.spec.text?.length, 2000);
+  await bounded.close();
+
+  const missing = await open({ kind: 'ai-issue', turn: { ...turn, turnId: 'missing' } });
+  assert.equal(missing.spec.lastAnswer, null);
+  await missing.close();
+  const selected = await open({ kind: 'ai-issue', from: 'failure_card', turn, quote: { title: ' Card ', line: ' Details ' } });
+  assert.equal(selected.spec.lastAnswer?.quote, 'Chosen answer.');
+  assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'failure_card' } });
+  const submit = handlers.get(feedback.FEEDBACK_SUBMIT_COMMAND)!;
+  const base = { token: selected.spec.token, text: ' My words. ', aiIssue: false, wantAnswer: false, withAnswer: false };
+  assert.equal(await submit({ ...base, route: 'straight', text: ' ', includeQuote: true }), null);
+  for (const includeQuote of [true, false]) {
+    const message = includeQuote ? 'My words.\n\nFrom the card:\nCard\nDetails' : 'My words.';
+    assert.deepEqual(await submit({ ...base, route: 'straight', includeQuote }), { route: 'straight', outcome: 'accepted' });
+    assert.deepEqual(events.pop(), { name: 'feedback_sent', properties: { message, from: 'failure_card' } });
+    const email = await submit({ ...base, route: 'email', includeQuote, aiIssue: true, withAnswer: true });
+    assert.equal(email.shown, message);
+    assert.equal(mailBody, email.copyText);
+    assert.ok(email.copyText.endsWith(`${message}\n\n${LAST_ANSWER_LABEL}\n> Chosen answer.`));
+  }
+  const fullField = 'x'.repeat(8000);
+  const longMail = await submit({ ...base, route: 'email', text: fullField, includeQuote: true });
+  assert.equal(longMail.outcome, 'too-long');
+  assert.ok(longMail.copyText.endsWith(fullField + '\n\nFrom the card:\nCard\nDetails'));
+  await selected.close();
+  assert.equal(await submit({ ...base, route: 'straight', includeQuote: true }), null);
+
+  const oldDoor = await open({ from: 'help' });
+  await submit({ ...base, token: oldDoor.spec.token, route: 'straight', includeQuote: true });
+  assert.deepEqual(events.pop(), { name: 'feedback_sent', properties: { message: 'My words.', from: 'sheet' } });
+  await oldDoor.close();
+});

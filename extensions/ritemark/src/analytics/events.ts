@@ -18,6 +18,7 @@ export type EventName =
   | 'starting_point_used'
   | 'made_something'
   | 'feedback_opened'
+  | 'ai_answer_reacted'
   | 'first_reply'
   | 'voice_captured'
   | 'voice_note_edited'
@@ -102,7 +103,12 @@ export interface EventPayloads {
     after_ready_request: boolean;
   };
   feedback_opened: {
-    from: 'status_bar' | 'help' | 'ai_info' | 'command';
+    from: 'status_bar' | 'help' | 'ai_info' | 'command' | 'thumb' | 'failure_card';
+  };
+  ai_answer_reacted: {
+    reaction: 'up' | 'down' | 'none';
+    ai: 'claude-code' | 'codex' | 'opencode';
+    model: string;
   };
   app_session_start: {
     version: string;
@@ -142,6 +148,7 @@ export interface EventPayloads {
   };
   feedback_sent: {
     message: string;
+    from?: 'sheet' | 'thumb' | 'failure_card';
     /** Sprint 140 (D11): which question the message answers; only the first-week card's send carries it. */
     asked?: 'made_this_week';
   };
