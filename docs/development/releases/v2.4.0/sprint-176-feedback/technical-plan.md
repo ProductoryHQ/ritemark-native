@@ -54,7 +54,7 @@ Proposed app-specific properties below. With usage data on, the existing shared 
 
 | Event | Exact properties and trigger | Usage data off |
 | --- | --- | --- |
-| `ai_answer_reacted` (new) | `reaction: up, down, or none` (Take back), `ai: claude-code, codex, or opencode`, and `model` (a registered ID or `other`). PR 3 calls `trackAnswerReaction`, which uses `trackEvent`. | No event. The mark can still count locally for Home. |
+| `ai_answer_reacted` (new) | `reaction: up, down, or none` (Take back) and `ai: claude-code, codex, or opencode` only. PR 3 calls `trackAnswerReaction`, which uses `trackEvent`. | No event. The mark can still count locally for Home. |
 | `feedback_opened` (changed) | `from: status_bar, help, ai_info, command, thumb, or failure_card`. Fires on the existing sheet-open request, or once when the inline words form opens from a thumb. | No event. |
 | `feedback_sent` (changed) | `message` (final visible, trimmed text) and `from: sheet, thumb, or failure_card`. Captured immediately on explicit straight Send, counted as delivered only on service acceptance. Old builds can still send `asked: made_this_week`. A kept card quote follows the trimmed field as its own block. | Exactly what goes today: the text only, on explicit Send via the existing one-off route, with no `from`, no shared properties or session events (manager, 25 November). |
 

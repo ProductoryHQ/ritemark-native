@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import type { FeedbackSheetSpec } from './feedbackSheet';
 import { composeReport, LAST_ANSWER_LABEL, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
 import { DELIVERY_CLAIM_WORDS } from '../reporting/reportCopy';
-import { buildMailtoUrl, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
+import { buildMailtoUrl, fitsInMailto, MAILTO_MAX_URL_CHARS } from '../reporting/reportTransport';
 import { emailRouteStrings, FEEDBACK_COPY } from './feedbackCopy';
 import { answerForSheet, mailKindOf, mailUrlOf, routeOf, SHORTENED_MARK, shortenAnswer } from './feedbackRoute';
 
@@ -90,10 +90,12 @@ assert.deepEqual(answerForSheet(context, 'A short answer.'), { text: 'A short an
 
 console.log('feedback: all assertions passed');
 
-test('feedback command validates the open and binds submissions to its card and turn', async () => {
+test('feedback command validates the open and binds submissions to its card and turn', async t => {
   const handlers = new Map<string, (...args: any[]) => any>();
   const events: unknown[] = [];
   let spec: FeedbackSheetSpec;
+  let shows = 0;
+  let lastReads = 0;
   let dismiss: () => void;
   let mailBody: string | null = null;
   const loader = Module as unknown as { _load(id: string, ...args: unknown[]): unknown };
@@ -103,6 +105,7 @@ test('feedback command validates the open and binds submissions to its card and 
       commands: {
         registerCommand: (name: string, handler: (...args: any[]) => any) => handlers.set(name, handler),
         executeCommand: (_name: string, opened: FeedbackSheetSpec) => {
+          shows++;
           spec = opened;
           return new Promise<void>(resolve => { dismiss = resolve; });
         },
@@ -125,7 +128,7 @@ test('feedback command validates the open and binds submissions to its card and 
   const turn = { conversationId: 'chat-elsewhere', turnId: 'chosen' };
   feedback.registerFeedback({ subscriptions: [] } as never, {
     appVersion: '2.4.0',
-    lastAnswer: async () => ({ title: 'Last chat', text: 'Last answer.' }),
+    lastAnswer: async () => { lastReads++; return { title: 'Last chat', text: 'Last answer.' }; },
     answerOfTurn: async ref => ref.turnId === turn.turnId && ref.conversationId === turn.conversationId
       ? { title: 'Chosen chat', text: 'Chosen answer.' } : null,
     openReportWindow: async () => {},
@@ -140,13 +143,69 @@ test('feedback command validates the open and binds submissions to its card and 
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'command' } });
   assert.equal(bad.spec.quote, undefined);
   assert.equal(bad.spec.text, undefined);
-  assert.equal(bad.spec.lastAnswer?.quote, 'Last answer.');
+  await t.test('malformed or absent contextual turn references never read the newest answer', async () => {
+    assert.equal(bad.spec.lastAnswer, null);
+    assert.equal(lastReads, 0);
+  });
   await bad.close();
-  for (const line of ['', '  ', 'https://user:pass@example.com', '/Users/example', 'C:\\Example', '~/file', '~/', '/tmp/file']) {
+  for (const options of [{ turn: undefined }, { turn: null }, { from: 'thumb' }, { from: 'failure_card' }]) {
+    const reads = lastReads;
+    const opened = await open(options);
+    await t.test(`no newest answer for ${JSON.stringify(options)}`, () => {
+      assert.equal(opened.spec.lastAnswer, null);
+      assert.equal(lastReads, reads);
+    });
+    await opened.close();
+  }
+
+  const start = handlers.get(feedback.FEEDBACK_OPEN_COMMAND)!;
+  await t.test('ignores a second open during the answer read and while the sheet is shown', async () => {
+    const before = shows;
+    const first = start({ from: 'help' });
+    const pending = start({ from: 'command' });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.ok(shows > before, 'the first sheet is now shown');
+    const shown = start({ from: 'ai_info' });
+    await Promise.resolve();
+    await Promise.resolve();
+    const seen = shows - before;
+    dismiss();
+    assert.equal(seen, 1);
+    await Promise.all([first, pending, shown]);
+  });
+  for (const line of ['', '  ', 'https://user:pass@example.com', '/Users/example', 'C:\\Example', '~/file', '~/', '/tmp/file', '“/Users/x/a.docx”', '‘/Users/…’', '«/home/x»', '</Users/x>', '{/Users/x}', '…/Documents/a.docx', 'https://ghp_token@github.com/…']) {
     const badQuote = await open({ quote: { title: 'Card', line } });
-    assert.equal(badQuote.spec.quote, undefined, line);
+    await t.test(`rejects quote ${line}`, () => assert.equal(badQuote.spec.quote, undefined));
     await badQuote.close();
   }
+  for (const line of ['Please run /login', 'Error 404: /v1/messages', 'See https://example.com/help']) {
+    const opened = await open({ quote: { title: 'Card', line } });
+    await t.test(`allows quote ${line}`, () => assert.equal(opened.spec.quote?.line, line));
+    await opened.close();
+  }
+  for (const title of ['😀'.repeat(80), 'a'.repeat(117) + '😀 word'.repeat(10), 'a'.repeat(117) + '\uD83D word'.repeat(10)]) {
+    const opened = await open({ quote: { title, line: 'Details' } });
+    await t.test('truncated emoji stays intact and safe for mailto', () => {
+      assert.ok(opened.spec.quote!.title.endsWith('…'));
+      assert.doesNotThrow(() => fitsInMailto({ recipient: REPORT_RECIPIENT, subject: 'Feedback', body: opened.spec.quote!.title }));
+    });
+    await opened.close();
+  }
+  const keys = [];
+  for (const options of [{}, { from: 'help', text: '' }, { quote: { title: 'Card', line: 'Details' } }, { quote: { title: ' Card ', line: 'Details' } }, { quote: { title: 'Card', line: 'Other details' } }, { turn }, { turn: { ...turn, turnId: 'another' } }]) {
+    const opened = await open(options);
+    keys.push(Reflect.get(opened.spec, 'draftKey'));
+    await opened.close();
+  }
+  await t.test('draft keys identify plain opens, individual cards and individual turns', () => {
+    assert.deepEqual(keys.slice(0, 2), ['', '']);
+    assert.match(keys[2], /^card:[a-f0-9]+$/);
+    assert.equal(keys[2], keys[3]);
+    assert.notEqual(keys[2], keys[4]);
+    assert.match(keys[5], /^turn:/);
+    assert.notEqual(keys[5], keys[6]);
+  });
   const bounded = await open({ from: 'thumb', text: 'x'.repeat(2001), quote: { title: 'word '.repeat(40), line: 'abc '.repeat(150) } });
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'thumb' } });
   assert.deepEqual(bounded.spec.quote, { title: `${'word '.repeat(24).trimEnd()}…`, line: `${'abc '.repeat(125).trimEnd()}…` });
@@ -156,8 +215,13 @@ test('feedback command validates the open and binds submissions to its card and 
   const missing = await open({ kind: 'ai-issue', turn: { ...turn, turnId: 'missing' } });
   assert.equal(missing.spec.lastAnswer, null);
   await missing.close();
-  const selected = await open({ kind: 'ai-issue', from: 'failure_card', turn, quote: { title: ' Card ', line: ' Details ' } });
-  assert.equal(selected.spec.lastAnswer?.quote, 'Chosen answer.');
+  const selected = await open({ from: 'failure_card', turn, quote: { title: ' Card ', line: ' Details ' } });
+  await t.test('a found turn opens as an AI issue with its answer selected', () => {
+    assert.equal(selected.spec.lastAnswer?.quote, 'Chosen answer.');
+    assert.equal(selected.spec.kind, 'ai-issue');
+    assert.equal(selected.spec.aiIssue, true);
+    assert.equal(Reflect.get(selected.spec, 'includeAnswer'), true);
+  });
   assert.deepEqual(events.pop(), { name: 'feedback_opened', properties: { from: 'failure_card' } });
   const submit = handlers.get(feedback.FEEDBACK_SUBMIT_COMMAND)!;
   const base = { token: selected.spec.token, text: ' My words. ', aiIssue: false, wantAnswer: false, withAnswer: false };

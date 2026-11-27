@@ -218,7 +218,7 @@ async function main(): Promise<void> {
       },
     });
     assert.equal(await h.gate.track('feedback_opened', { from: 'thumb' }), Boolean(setting));
-    assert.equal(await h.gate.track('ai_answer_reacted', { reaction: 'none', ai: 'codex', model: 'other' }), Boolean(setting));
+    assert.equal(await h.gate.track('ai_answer_reacted', { reaction: 'none', ai: 'codex' }), Boolean(setting));
     if (!setting) assert.equal(h.sent.length, 1);
   }
 

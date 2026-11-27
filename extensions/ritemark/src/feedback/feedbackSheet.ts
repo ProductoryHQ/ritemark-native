@@ -17,6 +17,7 @@
  * report window on the AI's sheet, and feedback to a one-line box.
  */
 
+import { createHash } from 'node:crypto';
 import * as vscode from 'vscode';
 import { sendFeedback, trackEvent } from '../analytics/posthog';
 import { composeReport, narrowReportContext, REPORT_RECIPIENT, reportSubject, type ReportContextV1 } from '../reporting/composeReport';
@@ -46,7 +47,7 @@ export interface FeedbackOpenOptions {
   kind?: 'feedback' | 'ai-issue';
   /** The visible card title and line. The sheet controls whether they are included. */
   quote?: FeedbackCardQuote;
-  /** Initial message, overriding this window's draft when supplied. */
+  /** Nonempty initial message, overriding a matching window draft. */
   text?: string;
   /** A particular completed answer to offer, independent of the chat currently open. */
   turn?: FeedbackTurnRef;
@@ -55,6 +56,8 @@ export interface FeedbackOpenOptions {
 /** What the workbench's sheet is given. */
 export interface FeedbackSheetSpec {
   token: string;
+  draftKey: string;
+  includeAnswer: boolean;
   kind: 'feedback' | 'ai-issue';
   aiIssue: boolean;
   isMac: boolean;
@@ -97,23 +100,28 @@ function recordOf(raw: unknown): Record<string, unknown> {
 }
 
 function boundQuotePart(value: string, limit: number): string {
-  if (value.length <= limit) return value;
+  if (value.length <= limit) return value.replace(/[\uD800-\uDFFF]/gu, '\uFFFD');
   const prefix = value.slice(0, limit - 1);
   const completeWords = /\s/.test(value[limit - 1]) ? prefix.trimEnd() : prefix.replace(/\s+\S*$/, '').trimEnd();
-  return `${completeWords || prefix.replace(/[\uD800-\uDBFF]$/, '')}…`;
+  return `${(completeWords || prefix).replace(/[\uD800-\uDBFF]$/, '').replace(/[\uD800-\uDFFF]/gu, '\uFFFD')}…`;
 }
 
-function decodeQuote(raw: unknown): FeedbackCardQuote | undefined {
+function decodeQuote(raw: unknown): { quote: FeedbackCardQuote; key: string } | undefined {
   const { title, line } = recordOf(raw);
   if (typeof title !== 'string' || typeof line !== 'string') return;
   const parts = [title, line].map(part => part.trim());
   // Reject paths and credential-bearing URLs anywhere in the supplied words, before truncation.
-  const credentials = /\/\/[^/\s:@]+:[^/\s@]*@/;
-  const absolutePath = /\b(?:[a-z]:(?:\\|\/(?!\/))|file:\/)|(?:^|[\s("'=,:\x60\[])(?:~[\\/]|(?:[\\/]|\\\\)[^\s/\\])/i;
-  if (parts.some(part => !part || credentials.test(part) || absolutePath.test(part))) return;
+  const credentials = /\/\/[^/\s?#@]+@/;
+  const absolutePath = /(?:^|[^\p{L}\p{N}])(?:[a-z]:[\\/]|file:\/|~[\\/]|\\+[^\s\\/]|\/[^\s/\\]+\/[^\s/\\])/iu;
+  // URLs without userinfo and versioned endpoints cited in HTTP errors are not local paths.
+  const nonPaths = /\b(?!file:)[a-z][a-z\d+.-]+:\/\/[^\s"\x27“”‘’«»<>{}]+|\b(?:error|http)\s+[1-5]\d{2}:\s+\/v\d+(?:\/[\w-]+)+(?=$|[\s“”‘’«»<>{}])/giu;
+  if (parts.some(part => !part || credentials.test(part) || absolutePath.test(part.replace(nonPaths, ' ')))) return;
   return {
-    title: boundQuotePart(parts[0].replace(/[\r\n\u2028\u2029]+/g, ' '), 120),
-    line: boundQuotePart(parts[1].replace(/[\r\n\u2028\u2029]+/g, ' '), 500),
+    quote: {
+      title: boundQuotePart(parts[0].replace(/[\r\n\u2028\u2029]+/g, ' '), 120),
+      line: boundQuotePart(parts[1].replace(/[\r\n\u2028\u2029]+/g, ' '), 500),
+    },
+    key: `card:${createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 16)}`,
   };
 }
 
@@ -123,14 +131,19 @@ function decodeTurn(raw: unknown): FeedbackTurnRef | undefined {
   return { conversationId, turnId };
 }
 
-function decodeOpen(raw: unknown): FeedbackOpenOptions {
+function decodeOpen(raw: unknown): FeedbackOpenOptions & { hasTurn: boolean; draftKey: string } {
   const value = recordOf(raw);
+  const card = decodeQuote(value.quote);
+  const turn = decodeTurn(value.turn);
+  const draftKey = turn ? `turn:${JSON.stringify([turn.conversationId, turn.turnId])}` : card?.key ?? '';
   return {
+    draftKey,
+    hasTurn: Object.prototype.hasOwnProperty.call(value, 'turn'),
     from: DOORS.includes(value.from as FeedbackDoor) ? (value.from as FeedbackDoor) : 'command',
     kind: value.kind === 'ai-issue' ? 'ai-issue' : 'feedback',
-    quote: decodeQuote(value.quote),
+    quote: card?.quote,
     text: typeof value.text === 'string' ? value.text.slice(0, 2_000).replace(/[\uD800-\uDBFF]$/, '') : undefined,
-    turn: decodeTurn(value.turn),
+    turn,
   };
 }
 
@@ -160,45 +173,56 @@ interface OpenSheet {
 export function registerFeedback(context: vscode.ExtensionContext, deps: FeedbackDependencies): void {
   let open: OpenSheet | null = null;
 
+  let opening = false;
   const openSheet = async (raw?: unknown): Promise<void> => {
-    const options = decodeOpen(raw);
-    void trackEvent('feedback_opened', { from: options.from });
-    const reportContext = narrowReportContext({ appVersion: deps.appVersion, platform: process.platform, occurredAt: new Date().toISOString() });
-    const last = await (options.turn ? deps.answerOfTurn(options.turn) : deps.lastAnswer()).catch(() => null);
-    const answer = last ? answerForSheet(reportContext, last.text) : null;
-    const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-    open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
-    const spec: FeedbackSheetSpec = {
-      token,
-      kind: options.kind ?? 'feedback',
-      aiIssue: options.kind === 'ai-issue',
-      isMac: process.platform === 'darwin',
-      quote: options.quote,
-      text: options.text,
-      lastAnswer: last && answer ? { chatTitle: last.title, quote: answer.text, shortened: answer.shortened } : null,
-      words: FEEDBACK_COPY,
-    };
-    // The sheet resolves with what happened: 'sent', 'mailed' or 'cancelled'.
-    let result: FeedbackSheetOutcome | undefined;
+    if (opening) return;
+    opening = true;
     try {
-      result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
-    } catch {
-      // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
-      if (spec.aiIssue && !options.turn) {
-        await deps.openReportWindow();
+      const options = decodeOpen(raw);
+      void trackEvent('feedback_opened', { from: options.from });
+      const reportContext = narrowReportContext({ appVersion: deps.appVersion, platform: process.platform, occurredAt: new Date().toISOString() });
+      const contextual = options.hasTurn || options.from === 'thumb' || options.from === 'failure_card';
+      const last = await (options.turn ? deps.answerOfTurn(options.turn)
+        : contextual ? Promise.resolve(null) : deps.lastAnswer()).catch(() => null);
+      const answer = last ? answerForSheet(reportContext, last.text) : null;
+      const token = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      open = { token, context: reportContext, from: options.from, quote: options.quote, answer: last && answer ? { shown: answer.text, whole: last.text.trim() } : null };
+      const includeAnswer = Boolean(options.turn && answer);
+      const aiIssue = options.kind === 'ai-issue' || includeAnswer;
+      const spec: FeedbackSheetSpec = {
+        token,
+        draftKey: options.draftKey,
+        includeAnswer,
+        kind: aiIssue ? 'ai-issue' : 'feedback',
+        aiIssue,
+        isMac: process.platform === 'darwin',
+        quote: options.quote,
+        text: options.text || undefined,
+        lastAnswer: last && answer ? { chatTitle: last.title, quote: answer.text, shortened: answer.shortened } : null,
+        words: FEEDBACK_COPY,
+      };
+      // The sheet resolves with what happened: 'sent', 'mailed' or 'cancelled'.
+      let result: FeedbackSheetOutcome | undefined;
+      try {
+        result = await vscode.commands.executeCommand<FeedbackSheetOutcome>(FEEDBACK_SHEET_COMMAND, spec);
+      } catch {
+        // A shell without the sheet (patch 018 before 2.1): 2.0's ways, so nothing is lost (R16).
+        if (spec.aiIssue && !contextual) {
+          await deps.openReportWindow();
+          return;
+        }
+        const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, value: options.text, ignoreFocusOut: true });
+        if (!text?.trim()) return;
+        const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), from: sentFrom(options.from) } }]);
+        if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
+        else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
         return;
       }
-      const text = await vscode.window.showInputBox({ title: FEEDBACK_COPY.sheet.feedback.title, prompt: FEEDBACK_COPY.sheet.feedback.lede, value: options.text, ignoreFocusOut: true });
-      if (!text?.trim()) return;
-      const sent = await sendFeedback([{ name: 'feedback_sent', properties: { message: text.trim(), from: sentFrom(options.from) } }]);
-      if (sent) void showBriefToast(FEEDBACK_COPY.toast.accepted);
-      else void vscode.window.showWarningMessage(FEEDBACK_COPY.sheet.failed);
-      return;
+      if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
     } finally {
-      // The sheet answered: its buttons can no longer send under this token.
-      if (open?.token === token) open = null;
+      open = null;
+      opening = false;
     }
-    if (result === 'sent') void showBriefToast(FEEDBACK_COPY.toast.accepted);
   };
 
   const submit = async (raw: unknown): Promise<FeedbackSubmitResult | null> => {

@@ -10,7 +10,6 @@
 import assert from 'node:assert/strict';
 import Module from 'node:module';
 import { test } from 'node:test';
-import { CLAUDE_MODEL_IDS } from '../ai/modelConfig';
 import { READY_CARD_KIND, SIGN_IN_FROM, WELCOME_SKIP_HOW, type EventName, type EventPayloads } from './events';
 
 // ── 1. Event type coverage ──────────────────────────────────
@@ -59,7 +58,7 @@ const _payloadCheck: {
   starting_point_used: { place: 'word_or_pdf', edited: true, provider: 'claude' },
   made_something: { how: 'new_document', after_ready_request: false },
   feedback_opened: { from: 'ai_info' },
-  ai_answer_reacted: { reaction: 'up', ai: 'claude-code', model: CLAUDE_MODEL_IDS.SONNET_5 },
+  ai_answer_reacted: { reaction: 'up', ai: 'claude-code' },
   first_reply: { provider: 'chatgpt', outcome: 'provider_error' },
   voice_captured: { source: 'transcribe', input: 'recorded' },
   voice_note_edited: { source: 'dictation', days_since_capture: 3 },
@@ -237,7 +236,7 @@ assert.strictEqual(shouldCapture(true, true, false), false, 'Should NOT capture 
 
 console.log('✓ All analytics tests passed');
 
-test('the reaction tracker sends only a reaction, runtime and registered model ID', async () => {
+test('the reaction tracker sends only a reaction and runtime', async () => {
   const tracked: unknown[] = [];
   const loader = Module as unknown as { _load(id: string, ...args: unknown[]): unknown };
   const load = loader._load;
@@ -268,12 +267,12 @@ test('the reaction tracker sends only a reaction, runtime and registered model I
     loader._load = load;
   }
   posthog.initAnalytics({ extension: { packageJSON: { version: '2.4.0' } }, subscriptions: [], globalState: { get: () => undefined } } as never);
-  await posthog.trackAnswerReaction('up', 'claude-code', CLAUDE_MODEL_IDS.SONNET_5);
-  await posthog.trackAnswerReaction('down', 'codex', 'custom/private');
-  await posthog.trackAnswerReaction('none', 'opencode', 'toString');
+  await posthog.trackAnswerReaction('up', 'claude-code');
+  await posthog.trackAnswerReaction('down', 'codex');
+  await posthog.trackAnswerReaction('none', 'opencode');
   assert.deepEqual(tracked, [
-    { name: 'ai_answer_reacted', properties: { reaction: 'up', ai: 'claude-code', model: CLAUDE_MODEL_IDS.SONNET_5 } },
-    { name: 'ai_answer_reacted', properties: { reaction: 'down', ai: 'codex', model: 'other' } },
-    { name: 'ai_answer_reacted', properties: { reaction: 'none', ai: 'opencode', model: 'other' } },
+    { name: 'ai_answer_reacted', properties: { reaction: 'up', ai: 'claude-code' } },
+    { name: 'ai_answer_reacted', properties: { reaction: 'down', ai: 'codex' } },
+    { name: 'ai_answer_reacted', properties: { reaction: 'none', ai: 'opencode' } },
   ]);
 });

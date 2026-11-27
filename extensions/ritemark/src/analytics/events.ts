@@ -108,7 +108,6 @@ export interface EventPayloads {
   ai_answer_reacted: {
     reaction: 'up' | 'down' | 'none';
     ai: 'claude-code' | 'codex' | 'opencode';
-    model: string;
   };
   app_session_start: {
     version: string;

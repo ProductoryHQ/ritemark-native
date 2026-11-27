@@ -32,6 +32,7 @@ export const FEEDBACK_COPY = {
     aiBox: 'This is about something the AI said or did',
     answerBox: "I'd like an answer",
     answerNote: 'This opens your e-mail app instead, so we can write back to you. Ritemark never asks for your address.',
+    selectedAnswerBox: "Add this answer",
     lastAnswerBox: "Add the AI's last answer in this chat",
     /** Followed by the chat's title in quotes. */
     lastAnswerNoteBefore: 'Only that answer, from "',

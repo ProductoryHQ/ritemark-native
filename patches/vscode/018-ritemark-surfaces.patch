@@ -3555,10 +3555,10 @@ index afa6942390e..a41b0cfe9a9 100644
  		this.doLayout(Dimension.lift(contentAreaSize), top, left);
 diff --git a/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
 new file mode 100644
-index 00000000000..6817e70b9a2
+index 00000000000..7faf4b385d4
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/media/ritemarkFeedbackSheet.css
-@@ -0,0 +1,288 @@
+@@ -0,0 +1,304 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -3719,32 +3719,47 @@ index 00000000000..6817e70b9a2
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card {
 +	position: relative;
-+	margin: 8px 0 0;
-+	padding-right: 36px;
-+	border: 1px solid var(--rm-hairline);
-+	border-radius: 6px;
-+	font-size: 13px;
-+	line-height: 20px;
++	padding: 8px 30px 8px 10px;
 +}
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-label {
 +	color: var(--rm-muted);
-+	font-size: 12px;
-+	line-height: 18px;
++	font-size: 11px;
++	line-height: 14px;
 +}
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-title {
 +	font-weight: 600;
++	color: var(--vscode-foreground);
 +}
 +
-+.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button.ritemark-feedback-card-remove {
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove {
 +	position: absolute;
-+	top: 4px;
-+	right: 4px;
-+	width: 24px;
-+	height: 24px;
-+	justify-content: center;
++	top: 6px;
++	right: 6px;
++	display: grid;
++	place-items: center;
++	width: 20px;
++	height: 20px;
 +	padding: 0;
++	border: 0;
++	border-radius: 4px;
++	background: transparent;
++	color: var(--rm-muted);
++	cursor: pointer;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove .codicon {
++	font-size: 12px;
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove:hover:not(:disabled),
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove:focus-visible {
++	background: var(--rm-hover);
++}
++
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove:disabled {
++	cursor: default;
 +}
 +
 +.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-quote-note {
@@ -3839,7 +3854,8 @@ index 00000000000..6817e70b9a2
 +	cursor: default;
 +}
 +
-+.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button:focus-visible {
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-button:focus-visible,
++.monaco-workbench .ritemark-feedback-sheet .ritemark-feedback-card-remove:focus-visible {
 +	outline: 2px solid var(--vscode-focusBorder);
 +	outline-offset: 2px;
 +}
@@ -3983,10 +3999,10 @@ index 252bcf8..718e4a1 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..e44dbefb2fc
+index 00000000000..1aed2491b67
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,443 @@
+@@ -0,0 +1,479 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4023,7 +4039,8 @@ index 00000000000..e44dbefb2fc
 +const BRIEF_TOAST_COMMAND = '_ritemark.briefToast';
 +
 +/** This workbench window's draft, held in memory with its layout container. */
-+const drafts = new WeakMap<HTMLElement, { text: string }>();
++const drafts = new WeakMap<HTMLElement, { key: string; text: string }>();
++const activeSheets = new WeakSet<HTMLElement>();
 +
 +/** How long a brief toast stays: the thank-you goes by itself after a few seconds (experience 35, The build checked). */
 +export const RITEMARK_BRIEF_TOAST_MS = 4000;
@@ -4038,6 +4055,7 @@ index 00000000000..e44dbefb2fc
 +		readonly answerBox: string;
 +		readonly answerNote: string;
 +		readonly lastAnswerBox: string;
++		readonly selectedAnswerBox?: string;
 +		readonly lastAnswerNoteBefore: string;
 +		readonly lastAnswerNoteAfter: string;
 +		readonly shortenedNote: string;
@@ -4074,6 +4092,8 @@ index 00000000000..e44dbefb2fc
 +export interface IRitemarkFeedbackSheetSpec {
 +	readonly token: string;
 +	readonly kind: 'feedback' | 'ai-issue';
++	readonly draftKey?: string;
++	readonly includeAnswer?: boolean;
 +	readonly aiIssue: boolean;
 +	readonly quote?: { readonly title: string; readonly line: string };
 +	readonly text?: string;
@@ -4143,13 +4163,19 @@ index 00000000000..e44dbefb2fc
 +
 +/** Draw the sheet in `container` and resolve with what happened once it closes. */
 +export function showRitemarkFeedbackSheet(container: HTMLElement, spec: IRitemarkFeedbackSheetSpec, deps: ISheetDeps): Promise<RitemarkFeedbackSheetOutcome> {
++	if (activeSheets.has(container)) {
++		return Promise.resolve('cancelled');
++	}
++	activeSheets.add(container);
 +	const words = spec.words;
 +	const store = new DisposableStore();
-+	const draft = { text: spec.text ?? drafts.get(container)?.text ?? '' };
-+	drafts.set(container, draft);
++	const draftKey = spec.draftKey ?? '';
++	const draft = drafts.get(container);
++	const initialText = spec.text || (draft?.key === draftKey ? draft.text : '');
 +	const previouslyFocused = container.ownerDocument.activeElement as HTMLElement | null;
 +	const block = append(container, $('.monaco-dialog-modal-block.dimmed.ritemark-feedback-block'));
 +	const sheet = append(block, $('.ritemark-feedback-sheet'));
++	sheet.tabIndex = -1;
 +	sheet.setAttribute('role', 'dialog');
 +	sheet.setAttribute('aria-modal', 'true');
 +	sheet.setAttribute('aria-labelledby', 'ritemark-feedback-title');
@@ -4157,15 +4183,26 @@ index 00000000000..e44dbefb2fc
 +
 +	return new Promise<RitemarkFeedbackSheetOutcome>(resolve => {
 +		let closed = false;
-+		const close = (outcome: RitemarkFeedbackSheetOutcome) => {
++		let went = false;
++		const close = (outcome: RitemarkFeedbackSheetOutcome, pointer: boolean) => {
 +			if (closed) {
 +				return;
 +			}
 +			closed = true;
-+			draft.text = area.value;
++			if (!went && area.value !== initialText) {
++				if (area.value) {
++					drafts.set(container, { key: draftKey, text: area.value });
++				} else if (draft?.key === draftKey) {
++					drafts.delete(container);
++				}
++			}
 +			store.dispose();
++			// Scripted focus can carry :focus-visible from the textarea to the opener.
++			if (!pointer) {
++				previouslyFocused?.focus();
++			}
 +			block.remove();
-+			previouslyFocused?.focus?.();
++			activeSheets.delete(container);
 +			resolve(outcome);
 +		};
 +
@@ -4179,7 +4216,7 @@ index 00000000000..e44dbefb2fc
 +		area.placeholder = kindWords.placeholder;
 +		area.setAttribute('aria-label', kindWords.title);
 +		area.maxLength = 8000;
-+		area.value = draft.text;
++		area.value = initialText;
 +		let includeQuote = false;
 +		let removeQuote: HTMLButtonElement | undefined;
 +		const { fromCard } = words.sheet;
@@ -4190,8 +4227,8 @@ index 00000000000..e44dbefb2fc
 +			append(card, $('.ritemark-feedback-card-label')).textContent = fromCard;
 +			append(card, $('.ritemark-feedback-card-title')).textContent = spec.quote.title;
 +			append(card, $('div')).textContent = spec.quote.line;
-+			removeQuote = button(card, '', 'ghost');
-+			removeQuote.classList.add('ritemark-feedback-card-remove');
++			removeQuote = append(card, $('button.ritemark-feedback-card-remove')) as HTMLButtonElement;
++			removeQuote.type = 'button';
 +			removeQuote.appendChild($('span.codicon.codicon-close', { 'aria-hidden': 'true' }));
 +			removeQuote.setAttribute('aria-label', leaveThisOut);
 +			const hint = deps.hint?.(removeQuote, () => leaveThisOut);
@@ -4209,7 +4246,11 @@ index 00000000000..e44dbefb2fc
 +		}
 +		const ai = box(sheet, words.sheet.aiBox, undefined);
 +		ai.input.checked = spec.aiIssue;
-+		const last = spec.lastAnswer ? box(sheet, words.sheet.lastAnswerBox, `${words.sheet.lastAnswerNoteBefore}${spec.lastAnswer.chatTitle}${words.sheet.lastAnswerNoteAfter}`) : undefined;
++		const answerLabel = spec.includeAnswer ? words.sheet.selectedAnswerBox ?? words.sheet.lastAnswerBox : words.sheet.lastAnswerBox;
++		const last = spec.lastAnswer ? box(sheet, answerLabel, `${words.sheet.lastAnswerNoteBefore}${spec.lastAnswer.chatTitle}${words.sheet.lastAnswerNoteAfter}`) : undefined;
++		if (last) {
++			last.input.checked = spec.includeAnswer === true;
++		}
 +		const quote = spec.lastAnswer ? append(sheet, $('.ritemark-feedback-quote')) : undefined;
 +		if (quote && spec.lastAnswer) {
 +			append(quote, $('.ritemark-feedback-quote-text')).textContent = spec.lastAnswer.quote;
@@ -4257,6 +4298,7 @@ index 00000000000..e44dbefb2fc
 +			primary.textContent = sending ? words.sheet.sending : email ? words.sheet.email.button : failed ? words.sheet.tryAgain : words.sheet.straight.button;
 +			primary.disabled = empty || sending;
 +			toEmail.disabled = empty || sending;
++			cancel.disabled = sending;
 +			for (const input of [area, ai.input, answer.input, last?.input, removeQuote]) {
 +				if (input) {
 +					input.disabled = sending;
@@ -4295,44 +4337,37 @@ index 00000000000..e44dbefb2fc
 +					}
 +				}, 2000);
 +			}));
-+			store.add(addDisposableListener(done, EventType.CLICK, () => close('mailed')));
++			store.add(addDisposableListener(done, EventType.CLICK, (event: MouseEvent) => close('mailed', event.detail > 0)));
 +			done.focus();
 +		};
 +
-+		const submit = async (forceEmail: boolean) => {
++		const submit = async (forceEmail: boolean, pointer: boolean) => {
 +			const text = area.value.trim();
 +			if (!text || sending) {
 +				return;
 +			}
 +			const chosen = forceEmail ? 'email' : route();
-+			sending = chosen === 'straight';
++			sending = true;
++			sheet.focus();
 +			update();
-+			const result = await deps.submit({ token: spec.token, route: chosen, text, aiIssue: ai.input.checked, wantAnswer: answer.input.checked, withAnswer: Boolean(last?.input.checked && ai.input.checked), includeQuote });
++			const result = await deps.submit({ token: spec.token, route: chosen, text, aiIssue: ai.input.checked, wantAnswer: answer.input.checked, withAnswer: Boolean(last?.input.checked && ai.input.checked), includeQuote }).catch(() => null);
 +			sending = false;
 +			// Words that went, by the service or to an opened e-mail app, are no longer a draft.
-+			const went = result?.route === 'straight' ? result.outcome === 'accepted' : result?.route === 'email' && result.outcome === 'opened';
-+			if (went && drafts.get(container) === draft) {
++			went = result?.route === 'straight' ? result.outcome === 'accepted' : result?.route === 'email' && result.outcome === 'opened';
++			if (went) {
 +				drafts.delete(container);
 +			}
-+			if (closed) {
-+				return;
-+			}
-+			if (result?.route === 'straight') {
-+				if (result.outcome === 'accepted') {
-+					close('sent');
-+					return;
-+				}
-+				failed = true; // D5: the sheet stays with the message, one line, and the e-mail route
-+				update();
-+				primary.focus();
++			if (result?.route === 'straight' && went) {
++				close('sent', pointer);
 +				return;
 +			}
 +			if (result?.route === 'email' && result.outcome !== 'invalid') {
 +				handOff(result);
 +				return;
 +			}
-+			failed = true;
++			failed = true; // D5: keep the message and offer retry or e-mail.
 +			update();
++			primary.focus();
 +		};
 +
 +		store.add(addDisposableListener(area, EventType.INPUT, () => update()));
@@ -4341,19 +4376,27 @@ index 00000000000..e44dbefb2fc
 +				store.add(addDisposableListener(input, EventType.CHANGE, () => update()));
 +			}
 +		}
-+		store.add(addDisposableListener(cancel, EventType.CLICK, () => close('cancelled')));
-+		store.add(addDisposableListener(primary, EventType.CLICK, () => void submit(false)));
-+		store.add(addDisposableListener(toEmail, EventType.CLICK, () => void submit(true)));
++		store.add(addDisposableListener(cancel, EventType.CLICK, (event: MouseEvent) => {
++			if (!sending) {
++				close('cancelled', event.detail > 0);
++			}
++		}));
++		store.add(addDisposableListener(primary, EventType.CLICK, (event: MouseEvent) => void submit(false, event.detail > 0)));
++		store.add(addDisposableListener(toEmail, EventType.CLICK, (event: MouseEvent) => void submit(true, event.detail > 0)));
 +		store.add(addDisposableListener(sheet, EventType.KEY_DOWN, (event: KeyboardEvent) => {
 +			const action = ritemarkFeedbackKey(event, deps.mac);
 +			if (action === 'cancel') {
 +				event.preventDefault();
 +				event.stopPropagation();
-+				close(sheet.classList.contains('handoff') ? 'mailed' : 'cancelled');
++				if (!sending) {
++					close(sheet.classList.contains('handoff') ? 'mailed' : 'cancelled', false);
++				}
 +			} else if (action === 'submit' && !sheet.classList.contains('handoff')) {
 +				event.preventDefault();
 +				event.stopPropagation();
-+				void submit(false);
++				void submit(false, false);
++			} else if (event.key === 'Tab' && sending) {
++				event.preventDefault();
 +			} else if (event.key === 'Tab') {
 +				// Tab stays in the sheet
 +				const focusable = [...sheet.querySelectorAll<HTMLElement>('textarea, input, button')].filter(element => !element.hidden && !(element as HTMLButtonElement).disabled && element.offsetParent !== null);
@@ -4385,16 +4428,25 @@ index 00000000000..e44dbefb2fc
 +				}
 +			}, 0);
 +		}));
-+		// Keep focus while pressing the scrim, then dismiss on the click.
++		// A drag can dispatch its click on the scrim, the common ancestor of both endpoints.
++		let pressedOnBlock = false;
++		let releasedOnBlock = false;
 +		store.add(addDisposableListener(block, EventType.MOUSE_DOWN, (event: MouseEvent) => {
-+			if (event.target === block) {
++			pressedOnBlock = event.button === 0 && event.target === block;
++			releasedOnBlock = false;
++			if (pressedOnBlock) {
 +				event.preventDefault();
 +			}
 +		}));
++		store.add(addDisposableListener(block, EventType.MOUSE_UP, (event: MouseEvent) => {
++			releasedOnBlock = event.target === block;
++		}));
 +		store.add(addDisposableListener(block, EventType.CLICK, (event: MouseEvent) => {
-+			if (event.target === block) {
-+				close(sheet.classList.contains('handoff') ? 'mailed' : 'cancelled');
++			if (!sending && pressedOnBlock && releasedOnBlock && event.target === block) {
++				close(sheet.classList.contains('handoff') ? 'mailed' : 'cancelled', true);
 +			}
++			pressedOnBlock = false;
++			releasedOnBlock = false;
 +		}));
 +
 +		update();
@@ -7917,10 +7969,10 @@ index 6851c3b584c..686f8932c2d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..4d709f64c2b
+index 00000000000..5dbfb983570
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,250 @@
+@@ -0,0 +1,405 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -7948,6 +8000,7 @@ index 00000000000..4d709f64c2b
 +			aiBox: 'This is about something the AI said or did',
 +			answerBox: 'I\'d like an answer',
 +			answerNote: 'This opens your e-mail app instead…',
++			selectedAnswerBox: 'Add this answer',
 +			lastAnswerBox: 'Add the AI\'s last answer in this chat',
 +			lastAnswerNoteBefore: 'Only that answer, from "',
 +			lastAnswerNoteAfter: '". You see it here before it\'s sent.',
@@ -8064,6 +8117,17 @@ index 00000000000..4d709f64c2b
 +		assert.strictEqual(sheet.hint(send), 'Write something first');
 +		const remove = card.querySelector('button')!;
 +		assert.strictEqual(sheet.hint(remove), 'Leave this out');
++		assert.strictEqual(remove.getAttribute('aria-label'), 'Leave this out');
++		assert.ok(remove.querySelector('.codicon-close'));
++		assert.ok(!remove.classList.contains('ritemark-feedback-button'));
++		sheet.container.classList.add('monaco-workbench');
++		const style = mainWindow.getComputedStyle(card);
++		assert.deepStrictEqual([style.fontSize, style.lineHeight, style.borderRadius, style.borderTopWidth, style.padding], ['12px', '18px', '8px', '0px', '8px 30px 8px 10px']);
++		const label = mainWindow.getComputedStyle(sheet.$('.ritemark-feedback-card-label'));
++		assert.deepStrictEqual([label.fontSize, label.lineHeight], ['11px', '14px']);
++		const icon = mainWindow.getComputedStyle(remove);
++		assert.deepStrictEqual([icon.width, icon.height, icon.top, icon.right, icon.borderTopWidth], ['20px', '20px', '6px', '6px', '0px']);
++		assert.strictEqual(mainWindow.getComputedStyle(remove.querySelector('.codicon-close')!).fontSize, '12px');
 +		remove.click();
 +		assert.strictEqual(card.isConnected, false);
 +		sheet.type('My words');
@@ -8073,42 +8137,185 @@ index 00000000000..4d709f64c2b
 +		sheet.dispose();
 +	});
 +
-+	test('outside and Escape restore focus and keep just the window draft; prefill wins and Send clears it', async () => {
-+		const focused = mainWindow.document.body.appendChild(mainWindow.document.createElement('button'));
-+		focused.focus();
++	function press(target: HTMLElement) {
++		target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 }));
++		target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
++		target.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
++	}
++
++	function escape(target: HTMLElement) {
++		target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
++	}
++
++	for (const action of ['outside', 'Cancel', 'Send', 'Done', 'Open in e-mail', 'Escape', 'keyboard Cancel']) {
++		test(`opener focus after ${action}`, async () => {
++			const opener = mainWindow.document.body.appendChild(mainWindow.document.createElement('a'));
++			opener.tabIndex = 0;
++			opener.focus();
++			const mail = action === 'Done' || action === 'Open in e-mail';
++			const sheet = open({ aiIssue: mail, text: 'My words' }, async () => mail
++				? { route: 'email', outcome: 'opened', kindLabel: 'Send feedback', shown: 'My words', copyText: 'My words' }
++				: { route: 'straight', outcome: 'accepted' });
++			if (mail) {
++				press(sheet.$('button.primary'));
++				await timeout(0);
++				assert.strictEqual(sheet.$('.ritemark-feedback-title').textContent, 'Your e-mail app is opening');
++				assert.notStrictEqual(mainWindow.document.activeElement, opener);
++			}
++			const keyboard = action === 'Escape' || action === 'keyboard Cancel';
++			if (action === 'Escape') {
++				escape(sheet.$('textarea'));
++			} else if (action === 'keyboard Cancel') {
++				sheet.$('button.ghost').click();
++			} else if (action === 'outside' || action === 'Open in e-mail') {
++				press(sheet.$('.ritemark-feedback-block'));
++			} else {
++				press(sheet.$(action === 'Cancel' ? 'button.ghost' : 'button.primary'));
++			}
++			await sheet.outcome;
++			const restored = mainWindow.document.activeElement === opener;
++			const ring = opener.matches(':focus-visible');
++			sheet.dispose();
++			opener.remove();
++			assert.deepStrictEqual([restored, ring], [keyboard, keyboard]);
++		});
++	}
++
++	for (const insideFirst of [true, false]) {
++		test(`drag ${insideFirst ? 'from field to scrim' : 'from scrim to field'} keeps the sheet open`, async () => {
++			const sheet = open({}, async () => null);
++			const block = sheet.$('.ritemark-feedback-block');
++			const area = sheet.$('textarea');
++			// Chromium dispatches click to the common ancestor of the press and release.
++			const first = insideFirst ? area : block;
++			const last = insideFirst ? block : area;
++			first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }));
++			last.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0 }));
++			block.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
++			const survived = block.isConnected;
++			if (survived) {
++				press(block);
++			}
++			assert.strictEqual(await sheet.outcome, 'cancelled');
++			sheet.dispose();
++			assert.ok(survived);
++		});
++	}
++
++	for (const via of ['outside', 'Escape']) {
++		test(`pending submit ignores ${via}`, async () => {
++			let finish!: (result: RitemarkFeedbackSubmitResult) => void;
++			const sheet = open({ text: 'My words' }, () => new Promise(resolve => { finish = resolve; }));
++			const block = sheet.$('.ritemark-feedback-block');
++			press(sheet.$('button.primary'));
++			assert.strictEqual(sheet.$('button.primary').textContent, 'Sending…');
++			if (via === 'outside') {
++				press(block);
++			} else {
++				escape(sheet.$('.ritemark-feedback-sheet'));
++			}
++			const survived = block.isConnected;
++			finish({ route: 'straight', outcome: 'accepted' });
++			assert.strictEqual(await sheet.outcome, 'sent');
++			sheet.dispose();
++			assert.ok(survived);
++		});
++	}
++
++	test('only one feedback sheet per container', async () => {
++		const first = open({}, async () => null);
++		const second = open({}, async () => null, first.container);
++		const dialogs = [...first.container.querySelectorAll<HTMLElement>('.ritemark-feedback-sheet')];
++		for (const dialog of dialogs) {
++			escape(dialog);
++		}
++		assert.deepStrictEqual(await Promise.all([first.outcome, second.outcome]), ['cancelled', 'cancelled']);
++		first.dispose();
++		assert.strictEqual(dialogs.length, 1);
++	});
++
++	test('a selected turn opens with its answer checked, quoted and included on submit', async () => {
++		const requests: IRitemarkFeedbackSubmit[] = [];
++		const spec = { kind: 'ai-issue', aiIssue: true, includeAnswer: true, text: 'My words', lastAnswer: { chatTitle: 'Chosen chat', quote: 'Chosen answer', shortened: false } } as const;
++		const sheet = open(spec, async request => { requests.push(request); return null; });
++		assert.strictEqual(sheet.container.querySelectorAll<HTMLInputElement>('.ritemark-feedback-check input')[1].checked, true);
++		assert.deepStrictEqual(sheet.visible('.ritemark-feedback-quote-text'), ['Chosen answer']);
++		assert.ok(sheet.visible('.ritemark-feedback-check').some(label => label?.startsWith('Add this answer')));
++		sheet.$('button.primary').click();
++		await timeout(0);
++		assert.strictEqual(requests[0].withAnswer, true);
++		escape(sheet.$('textarea'));
++		await sheet.outcome;
++		sheet.dispose();
++	});
++
++	const draftContexts = {
++		plain: { draftKey: '' },
++		card: { draftKey: 'card:one', quote: { title: 'Card', line: 'Details' } },
++		otherCard: { draftKey: 'card:two', quote: { title: 'Other card', line: 'Details' } },
++		turn: { draftKey: 'turn:chat:one' },
++		otherTurn: { draftKey: 'turn:chat:two' },
++	};
++	const draftCases = [['plain', 'card', ''], ['card', 'card', 'Draft words'], ['card', 'otherCard', ''], ['card', 'plain', ''], ['turn', 'turn', 'Draft words'], ['turn', 'otherTurn', ''], ['turn', 'plain', '']] as const;
++	for (const [from, to, expected] of draftCases) {
++		test(`draft from ${from} reopened in ${to}`, async () => {
++			const first = open(draftContexts[from], async () => null);
++			first.type('Draft words');
++			escape(first.$('textarea'));
++			await first.outcome;
++			const second = open(draftContexts[to], async () => null, first.container);
++			const value = second.$<HTMLTextAreaElement>('textarea').value;
++			escape(second.$('textarea'));
++			await second.outcome;
++			second.dispose();
++			assert.strictEqual(value, expected);
++		});
++	}
++
++	test('an unedited prefill keeps the previous draft, an empty prefill restores it, and an edited prefill replaces it', async () => {
 +		const container = mainWindow.document.createElement('div');
-+		const submit = async (request: IRitemarkFeedbackSubmit) => {
-+			assert.strictEqual(request.text, 'My new words');
-+			return { route: 'straight', outcome: 'accepted' } as const;
-+		};
-+		const first = open({ quote: { title: 'Card', line: 'Details' } }, submit, container);
-+		first.type('Draft words');
-+		first.$('.ritemark-feedback-block').dispatchEvent(new MouseEvent('click', { bubbles: true }));
-+		assert.strictEqual(container.querySelector('.ritemark-feedback-block'), null, 'outside click closes');
-+		assert.strictEqual(await first.outcome, 'cancelled');
-+		assert.strictEqual(mainWindow.document.activeElement, focused);
++		async function check(text: string | undefined, expected: string, edit?: string) {
++			const sheet = open({ text }, async () => null, container);
++			const area = sheet.$<HTMLTextAreaElement>('textarea');
++			const value = area.value;
++			if (edit !== undefined) {
++				sheet.type(edit);
++			}
++			escape(area);
++			await sheet.outcome;
++			sheet.dispose();
++			assert.strictEqual(value, expected);
++		}
++		await check(undefined, '', 'Draft words');
++		await check('Prefilled', 'Prefilled');
++		await check('', 'Draft words');
++		await check('Prefilled', 'Prefilled', 'New draft');
++		await check(undefined, 'New draft');
++	});
 +
-+		const second = open({}, submit, container);
-+		const area = second.$<HTMLTextAreaElement>('textarea');
-+		assert.strictEqual(area.value, 'Draft words');
-+		assert.strictEqual(container.querySelector('.ritemark-feedback-card'), null);
-+		area.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-+		assert.strictEqual(await second.outcome, 'cancelled');
-+		assert.strictEqual(mainWindow.document.activeElement, focused);
-+
-+		const third = open({ text: 'My new words' }, submit, container);
-+		const prefilled = third.$<HTMLTextAreaElement>('textarea');
-+		assert.strictEqual(prefilled.value, 'My new words');
-+		assert.deepStrictEqual([prefilled.selectionStart, prefilled.selectionEnd], [12, 12]);
-+		third.$('.ritemark-feedback-button.primary').click();
-+		assert.strictEqual(await third.outcome, 'sent');
-+
-+		const fourth = open({}, submit, container);
-+		assert.strictEqual(fourth.$<HTMLTextAreaElement>('textarea').value, '');
-+		fourth.$('.ritemark-feedback-button.ghost').click();
-+		await fourth.outcome;
-+		fourth.dispose();
-+		focused.remove();
++	test('edits in another context replace the window draft and an accepted Send clears it', async () => {
++		const plain = open({}, async () => null);
++		plain.type('Plain draft');
++		escape(plain.$('textarea'));
++		await plain.outcome;
++		const card = open(draftContexts.card, async () => null, plain.container);
++		card.type('Card draft');
++		escape(card.$('textarea'));
++		await card.outcome;
++		const reopened = open({}, async () => null, plain.container);
++		assert.strictEqual(reopened.$<HTMLTextAreaElement>('textarea').value, '');
++		escape(reopened.$('textarea'));
++		await reopened.outcome;
++		const send = open({ ...draftContexts.card, text: 'New message' }, async () => ({ route: 'straight', outcome: 'accepted' }), plain.container);
++		const prefilled = send.$<HTMLTextAreaElement>('textarea');
++		assert.deepStrictEqual([prefilled.value, prefilled.selectionStart, prefilled.selectionEnd], ['New message', 11, 11]);
++		send.$('button.primary').click();
++		assert.strictEqual(await send.outcome, 'sent');
++		const last = open(draftContexts.card, async () => null, plain.container);
++		assert.strictEqual(last.$<HTMLTextAreaElement>('textarea').value, '');
++		escape(last.$('textarea'));
++		await last.outcome;
++		last.dispose();
 +	});
 +
 +	test('after pressing: closed when accepted, one line when it did not go, the hand-off for the e-mail route', async () => {
