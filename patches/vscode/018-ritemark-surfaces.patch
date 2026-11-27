@@ -4052,10 +4052,10 @@ index 252bcf8..718e4a1 100644
  		}
 diff --git a/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
 new file mode 100644
-index 00000000000..847371e4940
+index 00000000000..f098b976f52
 --- /dev/null
 +++ b/src/vs/workbench/browser/parts/ritemarkFeedbackSheet.ts
-@@ -0,0 +1,749 @@
+@@ -0,0 +1,751 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -4524,6 +4524,8 @@ index 00000000000..847371e4940
 +			if (copyHandoff && pictureNote && pictureWords) {
 +				handoffNote.hidden = true;
 +				const copyPicture = button(foot, copyHandoff.pictureButton, 'ghost');
++				// The same icon family and size as Copy words' copy icon (the Experience lead).
++				copyPicture.prepend($('span.codicon.codicon-file-media'));
 +				if (deps.hint) {
 +					store.add(deps.hint(copyPicture, () => copyHandoff.pictureHint));
 +				}
@@ -8292,10 +8294,10 @@ index 6851c3b584c..686f8932c2d 100644
  	}
 diff --git a/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
 new file mode 100644
-index 00000000000..0bc499a2114
+index 00000000000..b1d6efed39c
 --- /dev/null
 +++ b/src/vs/workbench/test/browser/parts/ritemarkFeedbackSheet.test.ts
-@@ -0,0 +1,1065 @@
+@@ -0,0 +1,1068 @@
 +/*---------------------------------------------------------------------------------------------
 + *  Copyright (c) Microsoft Corporation. All rights reserved.
 + *  Licensed under the MIT License. See License.txt in the project root for license information.
@@ -8579,6 +8581,9 @@ index 00000000000..0bc499a2114
 +					await timeout(0);
 +					const retry = checked && outcome !== 'opened';
 +					assert.deepStrictEqual(sheet.visible('button'), retry ? ['Copy words', 'Copy picture', 'Done'] : ['Copy', 'Done']);
++					if (retry) {
++						assert.deepStrictEqual([...sheet.container.querySelectorAll('.ritemark-feedback-button.ghost')].map(button => button.querySelector('.codicon')?.className), ['codicon codicon-copy', 'codicon codicon-file-media']);
++					}
 +					const paste = pictureWords.paste.replace('{key}', outcome === 'too-long' ? 'Ctrl+V' : '⌘V');
 +					assert.deepStrictEqual(sheet.visible('.ritemark-feedback-picture-note'), checked ? [paste] : []);
 +					sheet.$('button.ghost').click();
