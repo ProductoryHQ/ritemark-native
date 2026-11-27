@@ -6,7 +6,7 @@
  * person does; every request is decoded field by field (`projects/protocol.ts`).
  */
 
-import { deckFolderCheck } from '../decks/deckFolderListing';
+import { deckFolderCheck, ritemarkFileInDeckFolder } from '../decks/deckFolderListing';
 import { createHash } from 'crypto';
 import { promises as fsp } from 'fs';
 import * as os from 'os';
@@ -607,10 +607,14 @@ export class HomeHost implements vscode.Disposable {
     if (any.length === 0) return { items: [], empty: true, pointers: new Set() };
     const pattern = `**/*{${[...RECENT_EXTENSIONS, '.flow.json'].join(',')}}`;
     const found = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, pattern), exclude, FILE_SCAN_LIMIT);
-    const inDeckFolder = deckFolderCheck(folder.uri.fsPath, async dir =>
-      (await fsp.readdir(dir, { withFileTypes: true })).filter(entry => entry.isFile()).map(entry => entry.name));
+    const isDeckAsset = deckFolderCheck(
+      folder.uri.fsPath,
+      async dir => (await fsp.readdir(dir, { withFileTypes: true }))
+        .filter(entry => entry.isFile() || entry.isSymbolicLink()).map(entry => entry.name),
+      ritemarkFileInDeckFolder,
+    );
     const files = (await Promise.all(found.map(async (uri) => {
-      if (await inDeckFolder(path.relative(folder.uri.fsPath, uri.fsPath).split(path.sep).join('/'))) return null;
+      if (await isDeckAsset(path.relative(folder.uri.fsPath, uri.fsPath).split(path.sep).join('/'))) return null;
       try {
         const stat = await vscode.workspace.fs.stat(uri);
         return { path: uri.fsPath, changedAt: stat.mtime };

@@ -17,7 +17,7 @@
  * A file kept only online is listed, never read (cloudFiles.ts); `.gitignore`
  * files and the pointer check obey the same rule.
  */
-import { deckFolderCheck, deckFolderNames, insideDeckFolder } from '../../decks/deckFolderListing';
+import { deckFolderCheck, deckFolderNames, ritemarkFileInDeckFolder } from '../../decks/deckFolderListing';
 import ignore, { type Ignore } from 'ignore';
 import * as nodePath from 'node:path';
 import type { DocumentFormat } from '../protocol';
@@ -217,8 +217,9 @@ export class RootRules {
   }
 }
 
-function inDeckFolder(root: string, fs: WalkFs) {
-  return deckFolderCheck(root, async dir => (await fs.readdir(dir)).filter(entry => entry.isFile()).map(entry => entry.name));
+function deckAssetCheck(root: string, fs: WalkFs) {
+  return deckFolderCheck(root, async dir => (await fs.readdir(dir))
+    .filter(entry => entry.isFile() || entry.isSymbolicLink()).map(entry => entry.name), ritemarkFileInDeckFolder);
 }
 
 function toRelative(rootPath: string, target: string): string {
@@ -293,7 +294,10 @@ export async function walkTree(
 ): Promise<boolean> {
   const { root, rules } = rootRules;
   if (documents.length >= maxNames) return true;
-  if (start !== root.path && await inDeckFolder(root.path, fs)(toRelative(root.path, start) + '/')) return false;
+  // An incremental walk can start below a deck's folder without visiting the deck's own directory.
+  const checkOnDisk = start === root.path ? null : deckAssetCheck(root.path, fs);
+  if (checkOnDisk && await checkOnDisk(toRelative(root.path, start) + '/')) return false;
+  const owned = new Set<string>();
   const queue: string[] = [start];
   let visited = 0;
   // Files are listed in the walk's order and stat'ed STAT_CONCURRENCY at a time, across folders: one stat after
@@ -340,12 +344,18 @@ export async function walkTree(
       if (text) rootRules.addGitRules(relativeDir, text);
     }
     const hasAgents = relativeDir === '' && entries.some((entry) => entry.name.toLowerCase() === 'agents.md');
-    const owned = deckFolderNames(entries.filter(entry => entry.isFile()).map(entry => entry.name));
+    const relativePath = (name: string) => relativeDir ? `${relativeDir}/${name}` : name;
+    const deckFolders = deckFolderNames(entries
+      .filter(entry => entry.isFile() || entry.isSymbolicLink())
+      .map(entry => entry.name));
+    for (const folder of deckFolders) owned.add(relativePath(folder));
     for (const entry of entries) {
       const name = entry.name;
       if (name.startsWith('.') || name === 'node_modules') continue;
       const target = nodePath.join(dir, name);
-      const relative = relativeDir ? `${relativeDir}/${name}` : name;
+      const relative = relativePath(name);
+      const listingPath = entry.isDirectory() ? relative + '/' : relative;
+      if (ritemarkFileInDeckFolder(listingPath, owned) || (checkOnDisk && await checkOnDisk(listingPath))) continue;
       let isDirectory = entry.isDirectory();
       let isFile = entry.isFile();
       if (entry.isSymbolicLink()) {
@@ -359,7 +369,7 @@ export async function walkTree(
         }
       }
       if (isDirectory) {
-        if (!insideDeckFolder(name + '/', owned) && !rootRules.excluded(relative, true)) queue.push(target);
+        if (!rootRules.excluded(relative, true)) queue.push(target);
         continue;
       }
       if (!isFile || name.startsWith('~$')) continue;
@@ -429,13 +439,14 @@ export async function classifyPath(
   const name = nodePath.basename(target);
   const format = formatOf(name);
   if (!format || name.startsWith('~$') || rootRules.excluded(relative, false)) return null;
+  if (await deckAssetCheck(rootRules.root.path, fs)(relative)) return null;
   let stat: WalkStat;
   try {
     stat = await fs.stat(target);
   } catch {
     return null;
   }
-  if (!stat.isFile() || await inDeckFolder(rootRules.root.path, fs)(relative)) return null;
+  if (!stat.isFile()) return null;
   const dir = nodePath.dirname(target);
   if (!relative.includes('/') && name.toLowerCase() === 'claude.md') {
     try {

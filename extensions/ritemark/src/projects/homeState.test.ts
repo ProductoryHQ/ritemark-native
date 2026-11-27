@@ -187,6 +187,8 @@ assert.deepEqual(recentItems(folder, [
   { path: at('Kickoff.rtms'), changedAt: 1 },
   { path: at('Kickoff.rtms.files/Kickoff.html'), changedAt: 2 },
   { path: at('Notes.rtms.files/x.md'), changedAt: 3 },
-], new Set()).map(file => file.path), [at('Notes.rtms.files/x.md'), at('Kickoff.rtms')]);
+  { path: at('Kickoff.rtms.files/readme.md'), changedAt: 4 },
+  { path: at('Kickoff.rtms.files/photo.png'), changedAt: 5 },
+], new Set()).map(file => file.path), [at('Kickoff.rtms.files/readme.md'), at('Notes.rtms.files/x.md'), at('Kickoff.rtms')]);
 
 console.log('projects/homeState: all assertions passed');

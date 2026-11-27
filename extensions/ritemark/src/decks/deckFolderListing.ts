@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { isPictureFile } from '../publish/fileKinds';
 import { deckPictureFolderName, isDeckPath, deckFileOfPictureFolder } from './deckFileName';
 
 /** The deck names in a directory determine which folders belong to decks. */
@@ -20,8 +21,27 @@ export function insideDeckFolder(relative: string, owned: ReadonlySet<string>): 
   return false;
 }
 
+/**
+ * Ritemark's assets in an owned deck folder, by path alone.
+ * Directory paths end in `/`, so only the top-level asset trees can be pruned.
+ */
+export function ritemarkFileInDeckFolder(relative: string, owned: ReadonlySet<string>): boolean {
+  for (const folder of candidateFolders(relative)) {
+    if (!owned.has(folder)) continue;
+    const inside = relative.slice(folder.length + 1);
+    if (inside.startsWith('fonts/') || inside.startsWith('logos/')) return true;
+    if (!inside.endsWith('/') && (isPictureFile(inside) ||
+      (!inside.includes('/') && path.posix.extname(inside).toLowerCase() === '.html'))) return true;
+  }
+  return false;
+}
+
 /** Check on disk, including siblings outside a caller's capped or filtered listing. */
-export function deckFolderCheck(root: string, listFiles: (dir: string) => Promise<string[]>) {
+export function deckFolderCheck(
+  root: string,
+  listFiles: (dir: string) => Promise<string[]>,
+  matches = insideDeckFolder,
+) {
   const listings = new Map<string, Promise<Set<string>>>();
   return async (relative: string): Promise<boolean> => {
     const owned = new Set<string>();
@@ -34,7 +54,7 @@ export function deckFolderCheck(root: string, listFiles: (dir: string) => Promis
       }
       if ((await names).has(path.posix.basename(folder))) owned.add(folder);
     }
-    return insideDeckFolder(relative, owned);
+    return matches(relative, owned);
   };
 }
 

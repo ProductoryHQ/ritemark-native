@@ -4,7 +4,7 @@
  * what name, what waits and with which AI, and the other projects' line.
  */
 
-import { insideDeckFolder, listedDeckFolders } from '../decks/deckFolderListing';
+import { ritemarkFileInDeckFolder, listedDeckFolders } from '../decks/deckFolderListing';
 import { createHash } from 'crypto';
 import * as path from 'path';
 import { isAboutFile, isRootClaudeFile, ABOUT_TITLE } from './aboutFile';
@@ -81,7 +81,7 @@ export function recentItems(
   const relative = (file: ChangedFile) => path.relative(folder, file.path).split(path.sep).join('/');
   const owned = listedDeckFolders(files.map(relative));
   return [...files]
-    .filter(file => !insideDeckFolder(relative(file), owned))
+    .filter(file => !ritemarkFileInDeckFolder(relative(file), owned))
     .filter((file) => !(isRootClaudeFile(folder, file.path) && pointerPaths.has(file.path)))
     .sort((a, b) => b.changedAt - a.changedAt || (a.path < b.path ? -1 : 1))
     .slice(0, limit)

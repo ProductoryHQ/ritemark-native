@@ -11,6 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { isDeckPath } from '../decks/deckFileName';
+import { deckFolderNames, ritemarkFileInDeckFolder } from '../decks/deckFolderListing';
 
 export type FileKind = 'word' | 'pdf' | 'spreadsheet' | 'presentation' | 'deck' | 'text' | 'picture' | 'other';
 
@@ -96,7 +97,7 @@ export interface ListOptions {
 /**
  * The names of a project's files, from directory entries only: no `stat`, no
  * open, so nothing is downloaded. Ritemark's `.ritemark/`, hidden files and
- * folders and `node_modules` are left out. A symbolic link (and, on Windows, a
+ * folders, `node_modules` and Ritemark’s deck assets are left out. A symbolic link (and, on Windows, a
  * cloud placeholder, which reads as one) counts by its name and is never
  * followed.
  */
@@ -104,6 +105,7 @@ export async function listFileNames(root: string, options: ListOptions = {}): Pr
   const limit = options.limit ?? COUNT_LIMIT;
   const names: string[] = [];
   const queue: string[] = [root];
+  const owned = new Set<string>();
   while (queue.length > 0) {
     const dir = queue.shift()!;
     let entries: fs.Dirent[];
@@ -112,14 +114,22 @@ export async function listFileNames(root: string, options: ListOptions = {}): Pr
     } catch {
       continue;
     }
+    const relativeDir = path.relative(root, dir).split(path.sep).join('/');
+    const relativePath = (name: string) => relativeDir ? `${relativeDir}/${name}` : name;
+    const deckFolders = deckFolderNames(entries
+      .filter(entry => entry.isFile() || entry.isSymbolicLink())
+      .map(entry => entry.name));
+    for (const folder of deckFolders) owned.add(relativePath(folder));
     for (const entry of entries) {
       if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      const relative = relativePath(entry.name);
       if (entry.isDirectory()) {
-        queue.push(path.join(dir, entry.name));
+        if (!ritemarkFileInDeckFolder(relative + '/', owned)) queue.push(path.join(dir, entry.name));
         continue;
       }
       if (!entry.isFile() && !entry.isSymbolicLink()) continue;
       if (dir === root && options.skipAtRoot?.has(entry.name)) continue;
+      if (ritemarkFileInDeckFolder(relative, owned)) continue;
       names.push(entry.name);
       if (names.length > limit) return { names, more: true };
     }
