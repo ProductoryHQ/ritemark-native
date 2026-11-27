@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { register } from 'node:module'
+import { test } from 'node:test'
 import type { DeckPageState } from '../../../../src/decks/deckProtocol'
 
 register(`data:text/javascript,${encodeURIComponent(
@@ -19,6 +20,8 @@ const React = await import('react')
 ;(globalThis as typeof globalThis & { React: typeof React }).React = React
 const { createElement } = React
 const { renderToStaticMarkup } = await import('react-dom/server')
+const { SplitButton } = await import('../ui/split-button')
+const { firstWordCut } = await import('../ui/button')
 const { parse } = await import('node-html-parser')
 const { DeckPublishControl, measuredSteps, pdfRequest, publishRequest, savedNotice, publishedChip, publishedMenu, pauseWords, sendLiveAction } = await import('./DeckPublish')
 
@@ -34,7 +37,6 @@ assert.equal(draw({ ready: false, kind: 'published', changed: true }), '')
 // Each state's words, one line each.
 assert.equal(words(draw({ ready: true, kind: 'unpublished', changed: false })), 'Publish')
 assert.equal(words(draw({ ready: true, kind: 'published', changed: false })), 'Published')
-assert.equal(words(draw({ ready: true, kind: 'published', changed: true })), 'Published · changed')
 assert.equal(words(draw({ ready: true, kind: 'publishing', changed: false })), 'Publishing…')
 assert.equal(words(draw({ ready: true, kind: 'unpublishing', changed: false })), 'Unpublishing…')
 // Publishing… and Unpublishing… can't be pressed; Publish and the chip can, the chip opening its menu.
@@ -44,6 +46,74 @@ assert.equal(button(draw({ ready: true, kind: 'published', changed: false }))!.g
 // The chip is the accent's (decks.css), the Publish button the bar's own.
 assert.ok(button(draw({ ready: true, kind: 'published', changed: false }))!.classList.contains('deck-publish-chip'))
 assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.classList.contains('deck-publish'))
+
+type RowProps = { children?: React.ReactNode; tip?: string; disabled?: boolean; role?: string; 'aria-checked'?: boolean; onSelect?: () => void }
+const rowsOf = (node: React.ReactNode): React.ReactElement<RowProps>[] =>
+  React.Children.toArray(node).flatMap(child => {
+    if (!React.isValidElement<RowProps>(child)) return []
+    return child.type === React.Fragment ? rowsOf(child.props.children) : [child]
+  })
+// A small text-only component (the pause words) is drawn by calling it, as React would.
+const textOf = (node: React.ReactNode): string => React.Children.toArray(node).map(child => {
+  if (!React.isValidElement<RowProps>(child)) return String(child)
+  if (typeof child.type === 'function' && child.props.children === undefined) {
+    return textOf((child.type as (props: unknown) => React.ReactNode)(child.props))
+  }
+  return textOf(child.props.children)
+}).join('')
+
+const changedDeck = { ready: true, kind: 'published', changed: true, address: 'https://example.workers.dev' } as const
+
+test('changed deck offers a direct publish action and the Published menu', () => {
+  let presses = 0
+  let split: React.ComponentProps<typeof SplitButton> | undefined
+  const html = renderToStaticMarkup(createElement(function Probe() {
+    const control = DeckPublishControl({ state: changedDeck, onPublish: () => { presses++ }, onAction: () => {} })
+    if (React.isValidElement<React.ComponentProps<typeof SplitButton>>(control) && control.type === SplitButton) split = control.props
+    return control
+  }))
+  const root = parse(html).querySelector('.deck-publish-slot[data-tone="outline"]')
+  assert.ok(root)
+  const [main, caret] = root.querySelectorAll('button')
+  assert.equal(main.text.trim(), 'Publish changes')
+  assert.ok(main.querySelector('svg'))
+  assert.equal(caret.getAttribute('aria-haspopup'), 'menu')
+  assert.ok(split)
+  assert.equal(split.main.tooltip, "Your changes aren't on the page yet")
+  assert.equal(split.menu.tooltip, 'See it online, copy its link or take it down')
+  assert.match(rowsOf(split.menu.content).map(row => textOf(row.props.children)).join(' '), /See online.*example\.workers\.dev.*Publish changes.*Unpublish/)
+  split.main.onClick()
+  assert.equal(presses, 1)
+})
+
+test('the unpublished split menu calls its action Publish', () => {
+  let menu: React.ReactNode
+  renderToStaticMarkup(createElement(function Probe() {
+    const control = DeckPublishControl({
+      state: { ready: true, kind: 'unpublished', changed: false, pdf: ['slides-and-handout'] },
+      onPublish: () => {}, onAction: () => {}, onSavePdf: () => {},
+    })
+    if (React.isValidElement<React.ComponentProps<typeof SplitButton>>(control) && control.type === SplitButton) menu = control.props.menu.content
+    return control
+  }))
+  assert.equal(textOf(rowsOf(menu)[0]?.props.children).trim(), 'Publish')
+})
+
+test('changed deck folds using the same first-word rule as Publish', () => {
+  const main = parse(draw(changedDeck)).querySelector('.rm-split-main')
+  assert.ok(main)
+  const firstWord = main.querySelector('[data-slot="first-word"]')
+  assert.equal(firstWord?.text, 'Publish')
+  assert.equal(main.querySelector('[data-slot="button-label"]')?.text, 'Publish changes')
+  assert.equal(firstWordCut({ right: 35 }, { right: 40 }), true)
+})
+
+test('republishing keeps the split and reads Publishing…', () => {
+  const root = parse(draw({ ...changedDeck, kind: 'publishing', changed: false })).querySelector('.rm-split[aria-busy="true"]')
+  assert.ok(root)
+  assert.equal(root.querySelector('.rm-split-main')?.text.trim(), 'Publishing…')
+  assert.ok(root.querySelectorAll('button').every(part => part.hasAttribute('disabled')))
+})
 
 // The bar (the Experience lead, frame 2): Saved · Publish · Present on the right (Card | Borderless moved into the gear's
 // popup on 16 November, slideSettingsPopup.test.ts). Publish is outlined with the globe, its chip takes its place once
@@ -161,29 +231,12 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   assert.equal(updating.dot, false)
   assert.equal(updating.spinning, true)
   assert.equal(updating.tip, 'Updating the published page…')
-  assert.equal(words(draw({ ...base, kind: 'publishing', address: 'https://example.workers.dev' })), 'Updating…')
   assert.equal(button(sending)?.getAttribute('aria-haspopup'), 'menu')
-  assert.match(draw(base), /deck-publish-chip/)
-  assert.match(publishedChip(base).tip, /changed since it was published/)
 }
 
 // Radix portals the menu in the browser. Inspect its rows and invoke the same select handlers.
 {
   const base = { ready: true, kind: 'published', changed: true, address: 'https://example.workers.dev' } as const
-  type RowProps = { children?: React.ReactNode; tip?: string; disabled?: boolean; role?: string; 'aria-checked'?: boolean; onSelect?: () => void }
-  const rowsOf = (node: React.ReactNode): React.ReactElement<RowProps>[] =>
-    React.Children.toArray(node).flatMap(child => {
-      if (!React.isValidElement<RowProps>(child)) return []
-      return child.type === React.Fragment ? rowsOf(child.props.children) : [child]
-    })
-  // A small text-only component (the pause words) is drawn by calling it, as React would.
-  const textOf = (node: React.ReactNode): string => React.Children.toArray(node).map(child => {
-    if (!React.isValidElement<RowProps>(child)) return String(child)
-    if (typeof child.type === 'function' && child.props.children === undefined) {
-      return textOf((child.type as (props: unknown) => React.ReactNode)(child.props))
-    }
-    return textOf(child.props.children)
-  }).join('')
   const pdf = createElement('span', null, 'Save slides as PDF…')
   let showMessage: unknown
   const menu = (state: DeckPageState) => rowsOf(publishedMenu(state, pdf, () => {}, () => {}, sendLiveAction, target => { showMessage = target }))
@@ -191,7 +244,13 @@ assert.ok(button(draw({ ready: true, kind: 'unpublished', changed: false }))!.cl
   const off = menu(base)
   const live = menu({ ...base, live: { on: true, state: 'live', tooltip: '' } })
   const actions = ['Update on every saveOpen pages catch up within about 15\u00a0seconds.', 'Copy link', 'See onlineexample.workers.dev', 'Save slides as PDF…']
-  assert.deepEqual(labels(off), [...actions, 'Update the page', 'Unpublish'])
+  test('the Published menu names the action and its busy state', () => {
+    assert.deepEqual(labels(off), [...actions, 'Publish changes', 'Unpublish'])
+    assert.deepEqual(labels(menu({ ...base, changed: false })), [...actions, 'Unpublish'])
+    const busy = menu({ ...base, kind: 'publishing', changed: false })
+    assert.deepEqual(labels(busy), [...actions, 'Publishing…', 'Unpublish'])
+    assert.equal(busy.find(row => textOf(row.props.children) === 'Publishing…')?.props.disabled, true)
+  })
   assert.deepEqual(labels(live), [...actions, 'Unpublish'])
   assert.equal(off[0].props.role, 'menuitemcheckbox')
   assert.equal(off[0].props['aria-checked'], false)
