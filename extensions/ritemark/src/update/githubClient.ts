@@ -6,9 +6,8 @@
 
 import { UpdateManifest, parseManifest } from './updateManifest';
 
-const REPO_OWNER = 'jarmo-productory';
-const REPO_NAME = 'ritemark-public';
-const API_ENDPOINT = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+export const RELEASE_REPO = 'ProductoryHQ/ritemark-native';
+const API_ENDPOINT = `https://api.github.com/repos/${RELEASE_REPO}/releases/latest`;
 
 export interface GitHubRelease {
   tag_name: string;
@@ -59,7 +58,7 @@ export async function fetchLatestRelease(): Promise<GitHubRelease | null> {
  * @returns UpdateManifest or null if not found
  */
 export async function fetchUpdateManifest(tagName: string): Promise<UpdateManifest | null> {
-  const manifestUrl = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${tagName}/update-manifest.json`;
+  const manifestUrl = `https://github.com/${RELEASE_REPO}/releases/download/${tagName}/update-manifest.json`;
 
   try {
     const response = await fetch(manifestUrl, {
@@ -92,7 +91,7 @@ export async function fetchUpdateManifest(tagName: string): Promise<UpdateManife
  * @returns GitHubRelease or null if not found
  */
 export async function fetchReleaseByTag(tagName: string): Promise<GitHubRelease | null> {
-  const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/${tagName}`;
+  const url = `https://api.github.com/repos/${RELEASE_REPO}/releases/tags/${tagName}`;
 
   try {
     const response = await fetch(url, {

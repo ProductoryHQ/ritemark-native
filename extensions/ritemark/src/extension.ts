@@ -602,7 +602,7 @@ export function activate(context: vscode.ExtensionContext) {
   unifiedViewProvider.connectLiveDeckPublisher(decks.publisher);
 
   // Model catalog (Sprint 89, GH #109): resolve model lists via live provider probes
-  // → remote catalog (ritemark-public) → on-disk cache → bundled baseline. The live
+  // → remote catalog (ProductoryHQ/ritemark-native) → on-disk cache → bundled baseline. The live
   // provider uses the user's own API keys (Anthropic /v1/models is provider-cadence and
   // supersedes the bundled SDK's supportedModels()). Never throws; getModels()/getDefault()
   // serve the bundled floor immediately.

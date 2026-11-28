@@ -3,12 +3,13 @@
  *
  *   cd extensions/ritemark
  *   npm run check:model-feed -- --candidate /tmp/model-catalog.json \
- *     [--current <ritemark-public>/feeds/model-catalog.json] [--refs v1.12.0,v2.0.0] \
+ *     [--current feeds/model-catalog.json] [--refs v1.12.0,v2.0.0] \
  *     [--accept <ref|legacy>:<provider>] [--out report.md]
  *
- * Every Ritemark from 1.8.1 reads `feeds/model-catalog.json` from ritemark-public,
- * with its own resolver: 1.8.1–1.11.0 take the feed whole, 1.12.0 and later merge it
- * row by row. For each release this script takes that release's own `schema.ts`,
+ * Ritemark 2.4 and later read `feeds/model-catalog.json` from ProductoryHQ/ritemark-native.
+ * Older clients read the same path from the previous repository. Versions
+ * 1.8.1–1.11.0 take the feed whole, and 1.12.0 and later merge it row by row.
+ * For each release this script takes that release's own `schema.ts`,
  * `resolver.ts`, `bundledCatalog.ts` and (from 1.12.0) `runtimeDeclarations.ts` with
  * `git archive`, resolves the current and the candidate feed with them, and prints
  * what changes: rows, each surface's default, and the Claude models declared to

@@ -1284,7 +1284,7 @@
     "test:integration": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/LLMNodeExecutor.integration.test.ts && npx tsx src/flows/nodes/ClaudeCodeNodeExecutor.integration.test.ts",
     "test:integration:free": "npx tsx src/flows/nodes/SaveFileNodeExecutor.integration.test.ts",
     "test:all": "npm run test && npm run test:integration",
-    "test:update": "npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/updateNotification.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts"
+    "test:update": "npx tsx src/update/releaseUrls.test.ts && npx tsx src/update/updateResolver.test.ts && npx tsx src/update/updateService.test.ts && npx tsx src/update/updateNotification.test.ts && npx tsx src/update/activationIntegrity.test.ts && npx tsx src/update/applyUpdate.test.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.4.0",

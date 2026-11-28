@@ -76,8 +76,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 EXTENSION_DIR="$PROJECT_ROOT/extensions/ritemark"
 OUTPUT_DIR="$PROJECT_ROOT/release-staging"
-REPO_OWNER="jarmo-productory"
-REPO_NAME="ritemark-public"
+REPO="ProductoryHQ/ritemark-native"
 
 # Validate arguments
 if [ -z "$1" ]; then
@@ -263,7 +262,7 @@ $DOWNLOAD_NAME"
         cat >> "$MANIFEST" << EOF
     {
       "path": "$file",
-      "url": "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/v$VERSION/$DOWNLOAD_NAME",
+      "url": "https://github.com/$REPO/releases/download/v$VERSION/$DOWNLOAD_NAME",
       "sha256": "$CHECKSUM",
       "size": $SIZE
     }
@@ -384,21 +383,21 @@ if [ "$CHANNEL" == "canary" ]; then
 fi
 echo ""
 echo "Commands:"
-echo -e "${YELLOW}  gh release create v$VERSION --repo $REPO_OWNER/$REPO_NAME \\
+echo -e "${YELLOW}  gh release create v$VERSION --repo $REPO \\
     --title \"v$VERSION\" --notes \"Extension update\" --prerelease \\
     $OUTPUT_DIR/upload/*${NC}"
 if [ "$CHANNEL" == "canary" ]; then
   echo ""
   echo "  # First canary publish only — the 'canary' tag release does not exist yet:"
-  echo -e "${YELLOW}  gh release create canary --repo $REPO_OWNER/$REPO_NAME \\
+  echo -e "${YELLOW}  gh release create canary --repo $REPO \\
     --title \"Canary update feed\" --notes \"Rolling canary update feed. Not a downloadable build.\" --prerelease${NC}"
   echo ""
   echo "  # Every canary publish — republish the feed asset onto the fixed canary tag:"
-  echo -e "${YELLOW}  gh release upload canary --repo $REPO_OWNER/$REPO_NAME \\
+  echo -e "${YELLOW}  gh release upload canary --repo $REPO \\
     --clobber $OUTPUT_DIR/upload/update-feed.json${NC}"
 else
   echo ""
   echo "  # Stable channel: clobber the feed onto the current 'latest' release."
-  echo -e "${YELLOW}  gh release upload \"\$(gh release view --repo $REPO_OWNER/$REPO_NAME --json tagName -q .tagName)\" \\
-    --repo $REPO_OWNER/$REPO_NAME --clobber $OUTPUT_DIR/upload/update-feed.json${NC}"
+  echo -e "${YELLOW}  gh release upload \"\$(gh release view --repo $REPO --json tagName -q .tagName)\" \\
+    --repo $REPO --clobber $OUTPUT_DIR/upload/update-feed.json${NC}"
 fi

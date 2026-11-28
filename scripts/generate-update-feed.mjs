@@ -5,8 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
-const REPO_OWNER = 'jarmo-productory';
-const REPO_NAME = 'ritemark-public';
+const REPO = 'ProductoryHQ/ritemark-native';
 
 // Sprint 98: the feed is cumulative-by-fetch — it reads the CURRENT feed and
 // merges the new release into it. That made it channel-blind: generating a
@@ -15,8 +14,8 @@ const REPO_NAME = 'ritemark-public';
 // and writes only its own feed. Keep `feedUrlForChannel` in sync with
 // `feedUrlForChannel` in extensions/ritemark/src/update/updateFeed.ts.
 export const CHANNELS = {
-  stable: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`,
-  canary: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/canary/update-feed.json`
+  stable: `https://github.com/${REPO}/releases/latest/download/update-feed.json`,
+  canary: `https://github.com/${REPO}/releases/download/canary/update-feed.json`
 };
 const DEFAULT_CHANNEL = 'stable';
 
@@ -172,7 +171,7 @@ function buildAsset(assetSpec, version) {
     platform,
     arch,
     assetName,
-    downloadUrl: `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${version}/${assetName}`,
+    downloadUrl: `https://github.com/${REPO}/releases/download/v${version}/${assetName}`,
     size,
     sha256
   };

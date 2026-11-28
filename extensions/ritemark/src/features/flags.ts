@@ -42,7 +42,7 @@ export type FlagId =
   | 'scheduled-tasks-daemon'
   // Sprint 82: draw.io diagram embedding
   | 'drawio-diagrams'
-  // Sprint 89: remote model catalog (GH #109) — fetch model lists from ritemark-public
+  // Sprint 89: remote model catalog (GH #109) — fetch model lists from the Ritemark repository
   | 'remote-model-catalog'
   // Sprint 94: comment callouts (#81) — editor-only comments + AI assignment
   | 'comment-callouts'
@@ -246,7 +246,7 @@ export const FLAGS: Record<FlagId, FeatureFlag> = {
   'remote-model-catalog': {
     id: 'remote-model-catalog',
     label: 'Remote Model Catalog',
-    description: 'Fetch the model catalog from ritemark-public so new models appear without an app update.',
+    description: 'Fetch the model catalog from the Ritemark repository so new models appear without an app update.',
     status: 'stable',
     platforms: ['darwin', 'win32', 'linux'],
   },

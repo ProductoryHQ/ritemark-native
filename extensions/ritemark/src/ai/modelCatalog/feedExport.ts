@@ -1,7 +1,7 @@
 /**
  * Bundled catalog → published feed document (Sprint 127, R4/R8).
  *
- * `feeds/model-catalog.json` in ritemark-public starts as the complete bundled
+ * `feeds/model-catalog.json` in ProductoryHQ/ritemark-native starts as the complete bundled
  * lineup, and each shell release refreshes it the same way, because clients on
  * older builds take a fresher feed wholesale. A refresh must not lose what only
  * the feed carries:

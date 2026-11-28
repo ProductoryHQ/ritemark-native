@@ -6,13 +6,11 @@
  */
 
 import { UpdateManifest, UpdateFile } from './updateManifest';
-
-const REPO_OWNER = 'jarmo-productory';
-const REPO_NAME = 'ritemark-public';
+import { RELEASE_REPO } from './githubClient';
 
 /** Public ring. Always the CURRENT `latest` GitHub release, so prereleases never reach it. */
 export const STABLE_UPDATE_FEED_URL =
-  `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest/download/update-feed.json`;
+  `https://github.com/${RELEASE_REPO}/releases/latest/download/update-feed.json`;
 
 /**
  * Pre-release verification ring (Sprint 98). A fixed `canary` tag release whose
@@ -21,7 +19,7 @@ export const STABLE_UPDATE_FEED_URL =
  * merges it into the stable feed only after it has been verified.
  */
 export const CANARY_UPDATE_FEED_URL =
-  `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/canary/update-feed.json`;
+  `https://github.com/${RELEASE_REPO}/releases/download/canary/update-feed.json`;
 
 export const DEFAULT_UPDATE_FEED_URL = STABLE_UPDATE_FEED_URL;
 
