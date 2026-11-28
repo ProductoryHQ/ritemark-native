@@ -42,8 +42,8 @@ function fixture() {
   const logs: string[] = [];
   const searches: Array<{ glob: string; limit: number }> = [];
   const fs: CreatedDeckFiles = {
-    listMarkdown: async (_deck, limit) => [...new Set([...content.keys(), ...openText.keys()])]
-      .filter(file => /\.(md|rtms)$/i.test(file)).slice(0, limit),
+    listMarkdown: async () => [...new Set([...content.keys(), ...openText.keys()])]
+      .filter(file => /\.(md|rtms)$/i.test(file)),
     kind: async file => folders.has(file) ? 'folder' : content.has(file) ? 'file' : undefined,
     readDeck: async file => {
       const value = openText.get(file) ?? content.get(file);
@@ -157,13 +157,87 @@ test('unsaved open Markdown text counts', async () => {
   assert.deepEqual(notices, [[shared, 'information']]);
 });
 
-for (const failure of ['too many files', 'unreadable file', 'failed listing']) {
+for (const hasUser of [true, false]) {
+  test(`a 2,000-note project ${hasUser ? 'names the folder user' : 'lets the folder follow or go to the Trash'}`, async () => {
+    const move = { from: original, to: 'work/archive/Kickoff.rtms' };
+    for (const action of ['move', 'delete']) {
+      const { fs, content, folders, changes, notices } = fixture();
+      content.delete(original);
+      for (let i = 0; i < 1999; i++) content.set(`notes/${i}.md`, 'No links');
+      content.set(review, hasUser ? reviewText.replace('Kickoff.', '%4bickoff%2e') : 'No links');
+      if (action === 'move') {
+        await rebase(fs, [move], move);
+        assert.deepEqual(changes, hasUser ? [] : ['rename work/Kickoff.rtms.files to work/archive/Kickoff.rtms.files']);
+        assert.deepEqual(notices, hasUser ? [[shared + stillFindsPictures, 'information']] : []);
+      } else {
+        await trashDeckFolders([{ file: original, text }], [original], fs);
+        assert.deepEqual(changes, hasUser ? [] : ['trash work/Kickoff.rtms.files']);
+        assert.deepEqual(notices, [[hasUser ? shared : trashed, 'information']]);
+      }
+      assert.equal(folders.has(assets), hasUser);
+    }
+  });
+}
+
+test('finds a deck image whose folder name uses a YAML escape and a URL-encoded space', async () => {
+  const { fs, content, folders, notices } = fixture();
+  const deck = 'work/Kick off.rtms';
+  const folder = deck + '.files';
+  await fs.rename(assets, folder);
+  for (let i = 0; i < 501; i++) content.set(`notes/${i}.md`, 'No links');
+  content.set('notes/Other.rtms', text.replace('image: Kickoff.rtms.files/x.png',
+    String.raw`image: "../work/\x4Bick%20off.rtms.files/x.png"`).replace('Kickoff.rtms.files/y.png', 'y.png'));
+  await trashDeckFolders([{ file: deck, text: text.replaceAll('Kickoff.rtms.files', 'Kick%20off.rtms.files') }], [deck], fs);
+  assert.ok(folders.has(folder));
+  assert.deepEqual(notices, [['“Kick off.rtms.files” stayed where it was, because “Other.rtms” uses it.', 'information']]);
+});
+
+test('reads each note once and only parses basename candidates', async () => {
+  const { fs, content, notices } = fixture();
+  content.set('notes/no match.md', 'No links');
+  content.set('notes/plain mention.md', 'Kickoff.rtms.files');
+  content.set(review, reviewText);
+  const reads: string[] = [];
+  const parsed: string[] = [];
+  const read = fs.readDeck;
+  fs.readDeck = async file => {
+    reads.push(file);
+    const value = await read(file);
+    return Object.assign(new String(value), {
+      split(separator: string) {
+        parsed.push(file);
+        return value.split(separator);
+      },
+    }) as unknown as string;
+  };
+  await trashDeckFolders([{ file: original, text }], [original], fs);
+  assert.deepEqual(reads.sort(), ['notes/no match.md', 'notes/plain mention.md', review].sort());
+  assert.deepEqual([...new Set(parsed)].sort(), ['notes/plain mention.md', review].sort());
+  assert.deepEqual(notices, [[shared, 'information']]);
+});
+
+test('the shared-folder check times out while a read is pending', async ({ mock }) => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  const { fs, content, notices } = fixture();
+  content.set(review, 'No links');
+  let finishRead!: (text: string) => void;
+  fs.readDeck = () => new Promise(resolve => { finishRead = resolve; });
+  const check = trashDeckFolders([{ file: original, text }], [original], fs);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  mock.timers.tick(3000);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  const noticesAtDeadline = [...notices];
+  finishRead('No links');
+  await check;
+  assert.deepEqual(noticesAtDeadline, [[incomplete, 'information']]);
+  assert.deepEqual(notices, noticesAtDeadline);
+});
+
+for (const failure of ['unreadable file', 'failed listing']) {
   test(`an incomplete check keeps the folder on delete and move with ${failure}`, async () => {
     const { fs, content, changes, notices } = fixture();
     content.delete(original);
-    if (failure === 'too many files') {
-      for (let i = 0; i < 501; i++) content.set(`notes/${i}.md`, 'No links');
-    } else if (failure === 'unreadable file') {
+    if (failure === 'unreadable file') {
       fs.listMarkdown = async () => [review];
     } else {
       fs.listMarkdown = async () => { throw new Error('EACCES'); };

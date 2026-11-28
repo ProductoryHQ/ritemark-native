@@ -250,24 +250,33 @@ const deckFolderFiles: CreatedDeckFiles = {
       return (error as NodeJS.ErrnoException).code === 'ENOENT' ? undefined : 'other';
     }
   },
-  async listMarkdown(deck, limit) {
+  async listMarkdown(deck, signal) {
     const uri = fileUri(deck);
     const root = vscode.workspace.getWorkspaceFolder(uri)?.uri ?? vscode.Uri.file(path.dirname(uri.fsPath));
     const pattern = new vscode.RelativePattern(root, '**/*.{[mM][dD],[mM][aA][rR][kK][dD][oO][wW][nN],[rR][tT][mM][sS]}');
-    const found = await vscode.workspace.findFiles(pattern, undefined, limit);
-    const files = new Set(found.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath)));
-    for (const { uri } of vscode.workspace.textDocuments) {
-      if (uri.scheme === 'file' && projectRelative(root.fsPath, uri.fsPath) !== null &&
-          classifyWorkspaceFileKind(uri.fsPath) === 'markdown') {
-        files.add(rootless(uri.fsPath));
+    const cancellation = new vscode.CancellationTokenSource();
+    const cancel = () => cancellation.cancel();
+    signal.addEventListener('abort', cancel, { once: true });
+    try {
+      const found = await vscode.workspace.findFiles(pattern, undefined, undefined, cancellation.token);
+      if (signal.aborted) return [];
+      const files = new Set(found.filter(file => file.scheme === 'file').map(file => rootless(file.fsPath)));
+      for (const { uri } of vscode.workspace.textDocuments) {
+        if (uri.scheme === 'file' && projectRelative(root.fsPath, uri.fsPath) !== null &&
+            classifyWorkspaceFileKind(uri.fsPath) === 'markdown') {
+          files.add(rootless(uri.fsPath));
+        }
       }
+      return [...files];
+    } finally {
+      signal.removeEventListener('abort', cancel);
+      cancellation.dispose();
     }
-    return [...files];
   },
-  async readDeck(file) {
+  async readDeck(file, signal) {
     const uri = fileUri(file);
     const open = vscode.workspace.textDocuments.find(document => document.uri.toString() === uri.toString());
-    return open?.getText() ?? fs.promises.readFile(uri.fsPath, 'utf8');
+    return open?.getText() ?? fs.promises.readFile(uri.fsPath, { encoding: 'utf8', signal });
   },
   async *listFolder(folder) {
     if (await deckFolderFiles.kind(folder) !== 'folder') throw new Error('Expected a plain deck folder');
