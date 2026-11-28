@@ -3,9 +3,10 @@ name: Extension tests
 # The extension's automatic tests: 469 test files, one or more per feature (decks, AI chat,
 # dictation, Flows, publishing, search, Excel and the other viewers, ...). Each checks that a
 # feature still does what it should, so a change in one place can't quietly break another.
-# They run here on every PR that touches the extension and on every merge to main, on a
-# macOS arm64 runner (dictation and Quick Look are Mac-only; standard runners are free on this
-# public repo), not on a developer's machine. A PR merges only when this check is green.
+# The full set runs here on every PR that touches the extension and on every merge to main,
+# split across 4 macOS arm64 runners at once so a run takes minutes, not a quarter of an hour
+# (dictation and Quick Look are Mac-only; standard runners are free on this public repo), not
+# on a developer's machine. A PR merges only when "npm test (extension)" is green.
 
 on:
   pull_request:
@@ -27,10 +28,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-chain:
-    name: npm test (extension)
+  shard:
+    name: tests ${{ matrix.shard }}/4
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - name: Checkout Ritemark
         uses: actions/checkout@v5
@@ -54,14 +59,54 @@ jobs:
         working-directory: extensions/ritemark
         run: npx tsc --noEmit -p ./
 
-      - name: Run the full test chain
+      - name: Run this shard of the test chain
         working-directory: extensions/ritemark
-        run: npm test > "$RUNNER_TEMP/npm-test.log" 2>&1
+        run: node scripts/run-test-shard.mjs $(( ${{ matrix.shard }} - 1 )) 4 > "$RUNNER_TEMP/npm-test.log" 2>&1
 
       - name: Show the failing lines
         if: failure()
         run: |
-          { grep -nE "not ok|Error|FAIL|✖" "$RUNNER_TEMP/npm-test.log" | head -60; echo '--- last lines ---'; tail -30 "$RUNNER_TEMP/npm-test.log"; } > "$RUNNER_TEMP/failing.txt" || true
+          { grep -E "✖ FAILED" "$RUNNER_TEMP/npm-test.log"; echo '--- error lines ---'; grep -nE "not ok|Error|FAIL" "$RUNNER_TEMP/npm-test.log" | head -40; } > "$RUNNER_TEMP/failing.txt" || true
+          cat "$RUNNER_TEMP/failing.txt"
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-test-log-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/npm-test.log
+            ${{ runner.temp }}/failing.txt
+          retention-days: 14
+          if-no-files-found: ignore
+
+  test-chain:
+    # The one check a PR waits for: green only when every shard passed.
+    name: npm test (extension)
+    needs: shard
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout Ritemark
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: All shards passed?
+        run: test "${{ needs.shard.result }}" = success
+
+      - name: Collect the failing lines
+        if: failure()
+        uses: actions/download-artifact@v4
+        with:
+          pattern: npm-test-log-*
+          path: ${{ runner.temp }}/logs
+
+      - name: Show the failing lines
+        if: failure()
+        run: |
+          cat "$RUNNER_TEMP"/logs/*/failing.txt > "$RUNNER_TEMP/failing.txt" 2>/dev/null || echo "No failing lines were saved; see the shard logs." > "$RUNNER_TEMP/failing.txt"
           cat "$RUNNER_TEMP/failing.txt"
 
       # Red main is never silent: one open issue labelled test-chain-red carries the failing
@@ -90,11 +135,3 @@ jobs:
           for n in $(gh issue list --label test-chain-red --state open --json number -q '.[].number'); do
             gh issue close "$n" --comment "Green again at \`${GITHUB_SHA::8}\` ([run](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}))."
           done
-
-      - name: Keep the log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-test-log
-          path: ${{ runner.temp }}/npm-test.log
-          retention-days: 14
